@@ -1,3 +1,5 @@
+<img src="docs/icon.png" alt="" width="96" align="right">
+
 # 3D Maker Generators
 
 Turn flat character art into multicolor, 3D-printable models: one part per color, ready for a multi-filament printer.

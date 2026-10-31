@@ -5,7 +5,7 @@
   "author": "Geletka Tech",
   "description": "3D Maker Generators",
   "copyright": "Geletka Tech",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "defaultMode": "window",
   "port": 0,
   "documentRoot": "/resources/",
