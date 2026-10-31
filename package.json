@@ -1,6 +1,7 @@
 {
   "name": "3d-maker-generators",
   "private": true,
+  "license": "MIT",
   "description": "Turn character art into multicolor 3D-printable models",
   "scripts": {
     "build": "python3 tools/build.py",

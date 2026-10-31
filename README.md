@@ -62,4 +62,4 @@ The portable app is `desktop/app/dist/MakerGenerators/MakerGenerators-win_x64.ex
 - Keep *Minimum line width* at about twice your nozzle width (0.8 mm for a 0.4 mm nozzle).
 - Cookie cutters: print lip-down without supports; use a food-safe filament and treat FDM cutters as hand-wash items.
 
-Made by G-Tech3D / Geletka Tech.
+Made by G-Tech3D / Geletka Tech. Released under the [MIT License](LICENSE); bundled third-party files keep their own licenses (see `vendor/README.md`).
