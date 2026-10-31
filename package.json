@@ -1,0 +1,12 @@
+{
+  "name": "3d-maker-generators",
+  "private": true,
+  "description": "Turn character art into multicolor 3D-printable models",
+  "scripts": {
+    "build": "python3 tools/build.py",
+    "test": "node tests/geometry.test.js"
+  },
+  "devDependencies": {
+    "three": "0.147.0"
+  }
+}

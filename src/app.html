@@ -1,0 +1,2383 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>3D Maker Generators</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&family=Fredoka:wght@700&family=Lilita+One&family=Bungee&family=Pacifico&display=swap" rel="stylesheet">
+<style>
+:root {
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  --paper: #eceff2;
+  --panel: #f8f9fa;
+  --ink: #1b1f25;
+  --muted: #5d6570;
+  --line: #d3d8de;
+  --brass: #b07a24;
+  --brass-ink: #7a5212;
+  --bed: #23272e;
+  --bed-line: #313640;
+  --focus: #2f6feb;
+  --danger: #b3261e;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "Instrument Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #16191e; --panel: #1d2127; --ink: #e8eaed; --muted: #9aa3ae; --line: #2e343c;
+    --brass: #d4a04a; --brass-ink: #e7bd72; --bed: #111418; --bed-line: #1f242b; --focus: #7aa7ff;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #16191e; --panel: #1d2127; --ink: #e8eaed; --muted: #9aa3ae; --line: #2e343c;
+  --brass: #d4a04a; --brass-ink: #e7bd72; --bed: #111418; --bed-line: #1f242b; --focus: #7aa7ff;
+}
+*, *::before, *::after { box-sizing: inherit; }
+[hidden] { display: none !important; }
+html { height: 100%; scroll-padding-top: env(safe-area-inset-top, 0px); }
+body { margin: 0; min-height: 100%; background: var(--paper); color: var(--ink); font: 15px/1.5 var(--body); }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.app { display: grid; grid-template-columns: minmax(320px, 400px) 1fr; min-height: 100vh; }
+.panel { position: relative; background: var(--panel); border-right: 1px solid var(--line); padding: 28px 24px 40px; overflow-y: auto; overflow-x: hidden; max-height: 100vh; }
+.stage { position: relative; display: flex; flex-direction: column; min-height: 100vh; background: var(--bed); }
+
+h1 { font: 700 30px/1.05 var(--display); letter-spacing: -0.02em; margin: 0 0 6px; }
+.lede { color: var(--muted); margin: 0 0 24px; max-width: 34ch; }
+
+.gens { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: -6px 0 8px; }
+.extlink { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 0 0 20px; font-size: 13.5px; }
+.extlink a { color: var(--muted); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+.extlink a:hover { color: var(--ink); text-decoration-color: currentColor; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.shapes { position: relative; display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin: 4px 0 4px; }
+.shapes input { position: absolute; opacity: 0; pointer-events: none; }
+.shapes label { display: grid; justify-items: center; gap: 4px; padding: 8px 0 6px; border: 1.5px solid var(--line); border-radius: 9px; cursor: pointer; font-size: 11.5px; font-weight: 500; color: var(--ink); min-width: 0; }
+.shapes svg { width: 24px; height: 24px; color: var(--muted); }
+.shapes input:checked + label { border-color: var(--brass); box-shadow: inset 0 0 0 1px var(--brass); }
+.shapes input:checked + label svg { color: var(--brass); }
+.shapes input:focus-visible + label { outline: 2px solid var(--focus); outline-offset: 2px; }
+.gens button { display: grid; gap: 2px; align-content: start; text-align: left; padding: 9px 10px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--paper); cursor: pointer; }
+.gens button b { font: 600 14px/1.2 var(--display); }
+.gens button small { color: var(--muted); font-size: 12.5px; line-height: 1.3; }
+.gens button[aria-selected="true"] { border-color: var(--brass); box-shadow: inset 0 0 0 1px var(--brass); background: color-mix(in srgb, var(--brass) 8%, var(--paper)); }
+.styles { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 8px 0 4px; }
+.styles input { position: absolute; opacity: 0; pointer-events: none; }
+.styles label { display: grid; justify-items: center; gap: 4px; padding: 8px 4px; border: 1.5px solid var(--line); border-radius: 9px; cursor: pointer; font-size: 13.5px; font-weight: 500; text-align: center; }
+.styles svg { width: 54px; height: 22px; }
+.styles input:checked + label { border-color: var(--brass); box-shadow: inset 0 0 0 1px var(--brass); }
+.styles input:focus-visible + label { outline: 2px solid var(--focus); outline-offset: 2px; }
+.sub-h { font: 600 14px/1.2 var(--display); margin: 18px 0 2px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font-size: 12px; }
+.step { border-top: 1px solid var(--line); padding: 18px 0 20px; }
+.step[aria-disabled="true"] { opacity: .45; pointer-events: none; }
+.step h2 { display: flex; align-items: baseline; gap: 10px; font: 600 17px/1.2 var(--display); margin: 0 0 12px; }
+.step h2 .n { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--ink); color: var(--panel); font: 600 13px/1 var(--body); transform: translateY(-1px); }
+.hint { color: var(--muted); font-size: 13.5px; margin: 6px 0 0; }
+
+.drop { display: grid; place-items: center; text-align: center; gap: 4px; padding: 22px 16px; border: 1.5px dashed var(--line); border-radius: 10px; cursor: pointer; transition: border-color .15s, background .15s; }
+.drop:hover, .drop.over { border-color: var(--brass); background: color-mix(in srgb, var(--brass) 7%, transparent); }
+.drop strong { font-weight: 600; }
+.drop span { color: var(--muted); font-size: 13.5px; }
+
+.field { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 12px; margin: 12px 0; }
+.field label { font-weight: 500; }
+.toggle { display: flex; align-items: center; gap: 10px; margin: 14px 0 4px; font-weight: 500; cursor: pointer; }
+.toggle input { width: 18px; height: 18px; accent-color: var(--brass); margin: 0; }
+.field[hidden] { display: none; }
+.field .num { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 13.5px; }
+.field .num input { width: 78px; text-align: right; font-variant-numeric: tabular-nums; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; color: var(--ink); }
+.field input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--brass); }
+.field select, .field input[type=number] { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
+
+.mirror-pick { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mirror-pick label { display: grid; gap: 6px; justify-items: center; padding: 10px; border: 1.5px solid var(--line); border-radius: 10px; cursor: pointer; font-weight: 500; }
+.mirror-pick input { position: absolute; opacity: 0; pointer-events: none; }
+.mirror-pick input:checked + label { border-color: var(--brass); box-shadow: inset 0 0 0 1px var(--brass); }
+.mirror-pick input:focus-visible + label { outline: 2px solid var(--focus); outline-offset: 2px; }
+.mirror-pick canvas { width: 100%; height: 120px; object-fit: contain; }
+
+.regions { display: grid; gap: 8px; margin-top: 12px; }
+.region { display: grid; grid-template-columns: 34px 1fr; gap: 4px 10px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
+.region.merged { opacity: .75; }
+body:not(.gen-cookie) #tCookieNote { display: none; }
+body.gen-cookie #sText > :not(h2):not(#tCookieNote) { display: none !important; }
+.ck-lines { display: grid; gap: 6px; margin: 6px 0 4px; }
+.ck-lines label { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+.ck-lines .sw { width: 16px; height: 16px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.18); }
+.region .chip { grid-row: span 2; position: relative; width: 34px; height: 34px; border-radius: 8px; overflow: hidden; border: 1px solid rgba(0,0,0,.2); }
+.region .chip input { position: absolute; inset: -8px; width: 50px; height: 50px; border: 0; padding: 0; cursor: pointer; }
+.region .top { display: flex; align-items: center; gap: 8px; }
+.region .name { flex: 1; min-width: 0; border: 0; background: transparent; font-weight: 600; padding: 2px 0; border-bottom: 1px solid transparent; }
+.region .name:hover, .region .name:focus { border-bottom-color: var(--line); outline: none; }
+.region .src { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.2); flex: none; }
+.region .row { display: flex; gap: 8px; align-items: center; font-size: 13.5px; color: var(--muted); flex-wrap: wrap; }
+.region select { max-width: 150px; }
+.region select, .region input[type=number] { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; font-size: 13.5px; }
+.region input[type=number] { width: 64px; }
+
+.tally { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 13.5px; color: var(--muted); }
+.tally .dots { display: flex; }
+.tally .dots i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--panel); margin-left: -4px; }
+.tally .dots i:first-child { margin-left: 0; }
+.tally.warn { color: var(--brass-ink); }
+
+.base-row { display: flex; align-items: center; gap: 10px; margin: 12px 0; }
+.base-row .chip { position: relative; width: 28px; height: 28px; border-radius: 6px; overflow: hidden; border: 1px solid rgba(0,0,0,.2); }
+.base-row .chip input { position: absolute; inset: -8px; width: 44px; height: 44px; border: 0; padding: 0; cursor: pointer; }
+
+.size-row { display: flex; gap: 16px; flex-wrap: wrap; margin: 2px 0 0; font-weight: 500; }
+.size-row label { display: inline-flex; align-items: center; gap: 6px; }
+.size-row input { width: 78px; text-align: right; font-variant-numeric: tabular-nums; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; }
+.fname { display: grid; gap: 4px; margin-top: 14px; }
+.fname label { font-weight: 500; }
+.fname .box { display: flex; align-items: center; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; }
+.fname .box:focus-within { outline: 2px solid var(--focus); outline-offset: 1px; }
+.fname input { flex: 1; min-width: 0; border: 0; background: transparent; padding: 8px 0; outline: none; }
+.fname small { color: var(--muted); font-size: 13px; }
+.btns { display: grid; gap: 8px; margin-top: 14px; }
+.slots { margin-top: 14px; border: 1px solid var(--line); border-radius: 9px; padding: 10px 12px; background: var(--paper); }
+.slots-head { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; font-weight: 600; }
+.slots-head small { font-weight: 400; color: var(--muted); font-size: 13px; order: 3; flex-basis: 100%; }
+.slots-head button { margin-left: auto; border: 0; background: none; color: var(--muted); cursor: pointer; padding: 2px 4px; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
+.slot-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 13.5px; }
+.slot-row .sw { width: 16px; height: 16px; border-radius: 50%; flex: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,.18); }
+.slot-row .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.slot-row select { flex: none; width: 150px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; font-size: 13.5px; }
+.slot-row .to { color: var(--muted); }
+.slot-row .sw.slotc { width: 12px; height: 12px; }
+body.orca .web-only { display: none !important; }
+body:not(.orca) .orca-only { display: none !important; }
+.btn { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 9px; border: 1px solid var(--line); background: var(--paper); cursor: pointer; font-weight: 600; text-align: left; }
+.btn small { font-weight: 400; color: var(--muted); }
+.btn.primary { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+.btn.primary small { color: color-mix(in srgb, var(--panel) 70%, transparent); }
+.btn:disabled { opacity: .5; cursor: default; }
+
+/* stage */
+.topbar { display: flex; align-items: flex-end; gap: 6px; position: relative; z-index: 2; }
+.hist { display: flex; gap: 2px; padding: 0 0 4px; }
+.hist button { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,.06); border: 0; color: #e6e8eb; padding: 6px 10px; border-radius: 7px; cursor: pointer; font-weight: 500; font-size: 13.5px; }
+.hist button:hover:not(:disabled) { background: rgba(255,255,255,.12); }
+.hist button:disabled { opacity: .35; cursor: default; }
+.hist svg { width: 15px; height: 15px; }
+.hist #resetBtn { margin-left: 8px; }
+.hist #resetBtn.armed { background: color-mix(in srgb, var(--danger) 55%, transparent); color: #fff; }
+body.orca .extlink { display: none; }
+.tabs { display: flex; gap: 4px; padding: 14px 16px 0; position: relative; z-index: 2; }
+.tabs button { background: transparent; border: 0; color: #9aa3ae; padding: 8px 14px; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: 500; }
+.tabs button[aria-selected="true"] { color: #f1f3f5; background: rgba(255,255,255,.06); }
+.view { position: relative; flex: 1; min-height: 420px; }
+.view > * { position: absolute; inset: 0; }
+#imgView { display: flex; align-items: center; justify-content: center; padding: 24px;
+  background-color: #2a2f37;
+  background-image: linear-gradient(45deg, #323843 25%, transparent 25%), linear-gradient(-45deg, #323843 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #323843 75%), linear-gradient(-45deg, transparent 75%, #323843 75%);
+  background-size: 22px 22px; background-position: 0 0, 0 11px, 11px -11px, -11px 0; }
+#imgView canvas { max-width: 100%; max-height: 100%; width: auto; height: auto; }
+#glView canvas { display: block; width: 100%; height: 100%; }
+.empty { display: grid; place-items: center; text-align: center; color: #9aa3ae; padding: 24px; }
+.empty p { max-width: 30ch; margin: 0; }
+.empty b { display: block; color: #e6e8eb; font: 600 22px/1.2 var(--display); margin-bottom: 6px; }
+.status { position: absolute; left: 16px; bottom: 14px; z-index: 3; color: #c6ccd3; font-size: 13.5px; background: rgba(17,20,24,.72); padding: 6px 10px; border-radius: 7px; pointer-events: none; }
+.status:empty { display: none; }
+.dims { position: absolute; right: 16px; bottom: 14px; z-index: 3; color: #e6e8eb; font: 600 15px/1 var(--display); background: rgba(17,20,24,.72); padding: 8px 11px; border-radius: 7px; font-variant-numeric: tabular-nums; }
+.dims:empty { display: none; }
+.region { cursor: pointer; }
+.region.focused { border-color: var(--brass); background: color-mix(in srgb, var(--brass) 10%, var(--paper)); }
+.base-row { cursor: pointer; border-radius: 8px; padding: 4px 6px; margin-left: -6px; margin-right: -6px; }
+.base-row.focused { background: color-mix(in srgb, var(--brass) 14%, transparent); }
+.focuschip { position: absolute; right: 16px; top: 58px; z-index: 4; display: flex; align-items: center; gap: 8px; color: #e6e8eb; font-size: 13.5px; background: rgba(17,20,24,.85); padding: 5px 6px 5px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,.12); }
+.focuschip i { width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(255,255,255,.3); }
+.focuschip button { border: 0; background: rgba(255,255,255,.08); color: #e6e8eb; border-radius: 6px; padding: 2px 8px; cursor: pointer; font-size: 13px; }
+.region.active { border-color: var(--brass); box-shadow: inset 0 0 0 1px var(--brass); }
+#preview { cursor: crosshair; }
+#glView canvas { cursor: grab; }
+.tools { position: absolute; right: 16px; top: 10px; z-index: 5; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; max-width: calc(100% - 200px); color: #c6ccd3; font-size: 13.5px; background: rgba(17,20,24,.85); padding: 5px; border-radius: 9px; border: 1px solid rgba(255,255,255,.1); }
+.tools .seg2 { display: flex; background: rgba(255,255,255,.06); border-radius: 7px; padding: 2px; }
+.tools .seg2 button { border: 0; background: transparent; color: #aab2bc; padding: 4px 10px; border-radius: 5px; cursor: pointer; font-weight: 500; }
+.tools .seg2 button[aria-pressed="true"] { background: #e8eaed; color: #1b1f25; }
+.tools .chip { position: relative; width: 26px; height: 26px; border-radius: 6px; overflow: hidden; border: 1px solid rgba(255,255,255,.35); flex: none; }
+.tools .chip input { position: absolute; inset: -8px; width: 42px; height: 42px; border: 0; padding: 0; cursor: pointer; }
+.tools .psw { display: flex; gap: 4px; }
+.tools .psw button { width: 20px; height: 20px; border-radius: 50%; border: 1px solid rgba(255,255,255,.35); padding: 0; cursor: pointer; }
+.tools .psw button[aria-pressed="true"] { box-shadow: 0 0 0 2px #d4a04a; }
+.tools .tip { padding: 0 6px 0 2px; }
+.tools [hidden] { display: none !important; }
+body.painting #preview, body.painting #glView canvas { cursor: cell; }
+.pop { position: absolute; z-index: 6; width: 290px; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; padding: 12px; box-shadow: 0 12px 32px rgba(0,0,0,.35); }
+.pop-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.pop-head b { flex: 1; font: 600 15px/1.2 var(--display); }
+.pop-head small { color: var(--muted); font-weight: 400; font-family: var(--body); }
+.pop-head .src { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.2); }
+.pop-close { border: 0; background: transparent; font-size: 20px; line-height: 1; padding: 2px 6px; cursor: pointer; color: var(--muted); border-radius: 6px; }
+.seg { position: relative; display: grid; grid-template-columns: 1fr 1fr; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 2px; margin-bottom: 10px; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label { text-align: center; padding: 5px 6px; border-radius: 6px; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--muted); }
+.seg input:checked + label { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.15); }
+.seg input:focus-visible + label { outline: 2px solid var(--focus); }
+.seg input:disabled + label { opacity: .45; cursor: default; }
+.pop-row { display: flex; align-items: center; gap: 10px; font-size: 13.5px; white-space: nowrap; }
+.pop-row .chip { position: relative; width: 34px; height: 34px; border-radius: 8px; overflow: hidden; border: 1px solid rgba(0,0,0,.2); flex: none; }
+.pop-row .chip input { position: absolute; inset: -8px; width: 50px; height: 50px; border: 0; padding: 0; cursor: pointer; }
+.pop-row input[type=number] { width: 64px; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; }
+.pop-sub { color: var(--muted); font-size: 13px; margin: 12px 0 6px; }
+.swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+.swatches button { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--panel); box-shadow: 0 0 0 1px var(--line); cursor: pointer; padding: 0; }
+.swatches button[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--brass); }
+.swatches button.flat { background: repeating-linear-gradient(45deg, var(--paper) 0 4px, var(--line) 4px 8px); }
+.region .spool { grid-column: 2; font-size: 12.5px; color: var(--muted); margin-top: -2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.base-row .spool { color: var(--muted); font-size: 12.5px; }
+input[type=color]:not([data-native]) { cursor: pointer; }
+.sp-back { position: fixed; inset: 0; z-index: 50; background: rgba(10,12,15,.55); display: grid; place-items: center; padding: 16px; }
+.sp { width: min(560px, 100%); max-height: min(720px, calc(100vh - 32px)); display: flex; flex-direction: column; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 20px 50px rgba(0,0,0,.4); overflow: hidden; }
+.sp-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px 10px; }
+.sp-head h3 { flex: 1; margin: 0; font: 600 18px/1.2 var(--display); }
+.sp-filters { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; padding: 0 16px 10px; }
+.sp-filters input, .sp-filters select { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; min-width: 0; }
+.sp-filters select { max-width: 150px; }
+.sp-sub { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 16px 8px; font-size: 13px; color: var(--muted); }
+.sp-sub label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.sp-recent { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 16px 10px; }
+.sp-recent:empty { display: none; }
+.sp-recent button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 3px 9px 3px 4px; font-size: 12.5px; cursor: pointer; max-width: 220px; }
+.sp-recent button span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-list { flex: 1; overflow-y: auto; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.sp-row { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 10px; width: 100%; text-align: left; border: 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); background: transparent; padding: 8px 16px; cursor: pointer; }
+.sp-row:hover, .sp-row:focus-visible { background: var(--paper); }
+.sp-row b { font-weight: 600; display: block; }
+.sp-row small { color: var(--muted); font-size: 12.5px; }
+.sp-row .de { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.sw { width: 26px; height: 26px; border-radius: 50%; border: 1px solid rgba(0,0,0,.25); flex: none; display: inline-block; }
+.sw.sm { width: 18px; height: 18px; }
+.sp-more { padding: 10px 16px; color: var(--muted); font-size: 13px; }
+.sp-foot { display: flex; align-items: center; gap: 10px; padding: 10px 16px 14px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+.sp-foot .custom { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); }
+.sp-foot .custom .chip { position: relative; width: 28px; height: 28px; border-radius: 6px; overflow: hidden; border: 1px solid rgba(0,0,0,.2); }
+.sp-foot .custom .chip input { position: absolute; inset: -8px; width: 44px; height: 44px; border: 0; padding: 0; cursor: pointer; }
+.sp-foot button.use { border: 1px solid var(--line); background: var(--paper); border-radius: 7px; padding: 4px 10px; cursor: pointer; font-weight: 500; }
+.sp-foot .src { margin-left: auto; }
+.tbox { width: 100%; min-height: 58px; resize: vertical; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font: inherit; color: var(--ink); line-height: 1.35; }
+.tfil { display: flex; align-items: center; gap: 10px; margin: 12px 0; }
+.tfil .chip { position: relative; width: 30px; height: 30px; border-radius: 7px; overflow: hidden; border: 1px solid rgba(0,0,0,.2); flex: none; }
+.tfil .chip input { position: absolute; inset: -8px; width: 46px; height: 46px; border: 0; padding: 0; cursor: pointer; }
+.tfil select { margin-left: auto; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; max-width: 170px; }
+.tfil .spool { display: block; color: var(--muted); font-size: 12.5px; }
+.hint.warn { color: var(--brass-ink); }
+.err { color: var(--danger); font-size: 13.5px; margin-top: 8px; }
+.err:empty { display: none; }
+
+@media (max-width: 860px) {
+  .app { grid-template-columns: 1fr; }
+  .panel { max-height: none; border-right: 0; border-bottom: 1px solid var(--line); order: 2; }
+  .stage { min-height: 62vh; order: 1; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; }
+  .view { min-height: 52vh; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="panel">
+    <h1>3D Maker Generators</h1>
+    <p class="lede" id="lede">Turn flat character art into printable models, one filament per color.</p>
+    <div class="gens" role="tablist" aria-label="Generator">
+      <button type="button" role="tab" id="genTray" aria-selected="true"><b>Trinket tray</b><small>Outline-shaped dish</small></button>
+      <button type="button" role="tab" id="genCoin" aria-selected="false"><b>Coin &amp; token</b><small>Raised or engraved</small></button>
+      <button type="button" role="tab" id="genKey" aria-selected="false"><b>Keychain</b><small>Flat, with key ring</small></button>
+      <button type="button" role="tab" id="genMag" aria-selected="false"><b>Magnet</b><small>Pockets on the back</small></button>
+      <button type="button" role="tab" id="genCoast" aria-selected="false"><b>Coaster</b><small>Flush art, drip rim</small></button>
+      <button type="button" role="tab" id="genBook" aria-selected="false"><b>Bookmark</b><small>Flat, tassel hole</small></button>
+      <button type="button" role="tab" id="genCookie" aria-selected="false"><b>Cookie cutter</b><small>Cutter + stamp</small></button>
+      <button type="button" role="tab" id="genFlat" aria-selected="false"><b>Flat model</b><small>Just the art, face down</small></button>
+    </div>
+    <p class="extlink"><a href="https://quikclicks.app/" target="_blank" rel="noopener noreferrer">Clicker maker <span aria-hidden="true">↗</span><span class="sr">(opens QuikClicks in a new tab)</span></a><a href="https://app.printhq.io/" target="_blank" rel="noopener noreferrer">PrintHQ Vault <span aria-hidden="true">↗</span><span class="sr">(opens in a new tab)</span></a></p>
+
+    <section class="step" id="s1">
+      <h2><span class="n">1</span>Image</h2>
+      <label class="drop" id="drop" tabindex="0">
+        <strong>Drop an image or click to choose</strong>
+        <span>PNG, JPG or SVG with a plain or transparent background works best. You can also paste.</span>
+        <input type="file" id="file" accept="image/*,.svg" hidden>
+      </label>
+      <div class="err" id="err"></div>
+    </section>
+
+    <section class="step" id="s2" aria-disabled="true">
+      <h2><span class="n">2</span>Background</h2>
+      <div class="field">
+        <label for="tol">Removal tolerance</label><span class="num"><input type="number" id="tolNum" min="5" max="140" step="1" value="40" inputmode="decimal" aria-label="Removal tolerance"></span>
+        <input type="range" id="tol" min="5" max="140" value="40">
+      </div>
+      <p class="hint">Raise it if background specks remain; lower it if parts of the art disappear.</p>
+    </section>
+
+    <section class="step" id="s3" aria-disabled="true">
+      <h2><span class="n">3</span>Orientation</h2>
+      <div class="mirror-pick" role="radiogroup" aria-label="Orientation">
+        <input type="radio" name="mirror" id="mNo" value="0" checked><label for="mNo"><canvas id="thumbA"></canvas>As uploaded</label>
+        <input type="radio" name="mirror" id="mYes" value="1"><label for="mYes"><canvas id="thumbB"></canvas>Mirrored</label>
+      </div>
+    </section>
+
+    <section class="step" id="s4" aria-disabled="true">
+      <h2><span class="n">4</span>Colors</h2>
+      <div class="field">
+        <label for="kc">Colors to detect</label><span class="num"><input type="number" id="kcNum" min="2" max="12" step="1" value="6" inputmode="decimal" aria-label="Colors to detect"></span>
+        <input type="range" id="kc" min="2" max="12" value="6">
+      </div>
+      <div class="field">
+        <label for="speck">Ignore regions smaller than</label><span class="num"><input type="number" id="speckNum" min="0" max="10" step="0.1" value="1.5" inputmode="decimal" aria-label="Ignore regions smaller than"><span>mm²</span></span>
+        <input type="range" id="speck" min="0" max="10" step="0.1" value="1.5">
+      </div>
+      <label class="toggle"><input type="checkbox" id="simplifyColors" checked> Merge similar shades</label>
+      <p class="hint" style="margin-top:0">Keeps line art to its real colors instead of many greys. Turn off for art with subtle shading.</p>
+      <label class="toggle"><input type="checkbox" id="uniformH" checked> Same height for every color</label>
+      <div class="field" id="imgHField">
+        <label for="imgH">Image height above base</label><span class="num"><input type="number" id="imgHNum" min="0.2" max="20" step="0.1" value="3" inputmode="decimal" aria-label="Image height above base"><span>mm</span></span>
+        <input type="range" id="imgH" min="0.2" max="20" step="0.1" value="3">
+      </div>
+      <p class="hint">Click a color's card to highlight where it is on the model. To colorize line art, use Paint above the preview: pick a color, then click each part. Pick a filament for each region, or click parts of the preview to color them one by one. Turn off the height toggle to set heights per color. Changing the color-detection sliders starts the colors over.</p>
+      <div class="regions" id="regions"></div>
+      <div class="base-row" id="baseRow" title="Click to highlight the base on the model">
+        <span class="chip"><input type="color" id="baseColor" value="#1a1a1a" aria-label="Base filament color"></span>
+        <span><b>Base</b> filament <span class="spool" id="baseSpool"></span></span>
+      </div>
+      <div class="tally" id="tally"></div>
+    </section>
+
+    <section class="step" id="sText" aria-disabled="true">
+      <h2><span class="n">5</span>Text <small style="font:400 13px var(--body);color:var(--muted)">optional</small></h2>
+      <p class="hint" id="tCookieNote">Cookie cutters follow the art's outline, so text is not added. Put words on the cookie with icing.</p>
+      <textarea id="tText" class="tbox" rows="2" maxlength="60" placeholder="Add a name or message" spellcheck="false"></textarea>
+      <div id="tOpts" hidden>
+      <div class="field">
+        <label for="tFont">Font</label>
+        <select id="tFont"><option value="Fredoka|700">Fredoka (rounded)</option><option value="Lilita One|400">Lilita One (chunky)</option><option value="Bungee|400">Bungee (blocky)</option><option value="Bricolage Grotesque|700">Bricolage (clean)</option><option value="Pacifico|400">Pacifico (script)</option></select>
+      </div>
+      <div class="field">
+        <label for="tPos">Position</label>
+        <select id="tPos"><option value="below">Below the art</option><option value="above">Above the art</option><option value="over">On the art</option><option value="arc-bottom">Curved along the bottom</option><option value="arc-top">Curved along the top</option></select>
+      </div>
+      <div class="field" id="tSizeField">
+        <label for="tSize">Letter size</label><span class="num"><input type="number" id="tSizeNum" min="6" max="40" step="1" value="16" inputmode="decimal" aria-label="Letter size"><span>%</span></span>
+        <input type="range" id="tSize" min="6" max="40" step="1" value="16">
+      </div>
+      <p class="hint" id="tSizeHint">Height of a capital letter as a share of the art's height.</p>
+      <div class="field" id="tSpaceField">
+        <label for="tSpace">Letter spacing</label><span class="num"><input type="number" id="tSpaceNum" min="-10" max="40" step="1" value="4" inputmode="decimal" aria-label="Letter spacing"><span>%</span></span>
+        <input type="range" id="tSpace" min="-10" max="40" step="1" value="4">
+      </div>
+      <div class="field" id="tGapField">
+        <label for="tGap">Gap from art</label><span class="num"><input type="number" id="tGapNum" min="0" max="30" step="1" value="4" inputmode="decimal" aria-label="Gap from art"><span>%</span></span>
+        <input type="range" id="tGap" min="0" max="30" step="1" value="4">
+      </div>
+      <div class="tfil">
+        <span class="chip"><input type="color" id="tColor" value="#ffffff" aria-label="Text filament"></span>
+        <span><b>Text</b> filament<span class="spool" id="tSpool"></span></span>
+        <select id="tFil" aria-label="Text filament"></select>
+      </div>
+      <div class="field" id="tHField">
+        <label for="tH">Text height above base</label><span class="num"><input type="number" id="tHNum" min="0.2" max="20" step="0.1" value="3" inputmode="decimal" aria-label="Text height above base"><span>mm</span></span>
+        <input type="range" id="tH" min="0.2" max="20" step="0.1" value="3">
+      </div>
+      </div>
+    </section>
+
+    <section class="step" id="s5" aria-disabled="true">
+      <h2><span class="n">6</span><span id="s5Title">Tray</span></h2>
+      <div id="trayOpts">
+      <div class="field">
+        <label for="hmm">Overall height</label><span class="num"><input type="number" id="hmmNum" min="20" max="400" step="0.5" value="156" inputmode="decimal" aria-label="Overall height"><span>mm</span></span>
+        <input type="range" id="hmm" min="20" max="400" step="0.5" value="156">
+      </div>
+      <div class="size-row">
+        <label>Width <input type="number" id="wmm" min="5" max="400" step="0.5" inputmode="decimal" aria-label="Overall width in mm"> mm</label>
+        <label>Scale <input type="number" id="scalePct" min="13" max="256" step="1" value="100" inputmode="decimal" aria-label="Scale percent"> %</label>
+      </div>
+      <p class="hint">Width and height stay proportional. 100% is 156 mm tall.</p>
+      <div class="field">
+        <label for="base">Base thickness</label><span class="num"><input type="number" id="baseNum" min="0.6" max="8" step="0.1" value="3" inputmode="decimal" aria-label="Base thickness"><span>mm</span></span>
+        <input type="range" id="base" min="0.6" max="8" step="0.1" value="3">
+      </div>
+      <div class="field">
+        <label for="rim">Border around the art</label><span class="num"><input type="number" id="rimNum" min="0" max="10" step="0.1" value="2" inputmode="decimal" aria-label="Border around the art"><span>mm</span></span>
+        <input type="range" id="rim" min="0" max="10" step="0.1" value="2">
+      </div>
+      <div class="field">
+        <label for="rimStyle">Border wall</label>
+        <select id="rimStyle"></select>
+      </div>
+      <div class="field" id="rimHField">
+        <label for="rimH">Wall height above base</label><span class="num"><input type="number" id="rimHNum" min="0.2" max="30" step="0.1" value="5" inputmode="decimal" aria-label="Wall height above base"><span>mm</span></span>
+        <input type="range" id="rimH" min="0.2" max="30" step="0.1" value="5">
+      </div>
+      <div class="field">
+        <label for="round">Round inside corners</label><span class="num"><input type="number" id="roundNum" min="0" max="8" step="0.1" value="0" inputmode="decimal" aria-label="Round inside corners"><span>mm</span></span>
+        <input type="range" id="round" min="0" max="8" step="0.1" value="0">
+      </div>
+      </div>
+      <div id="cookieOpts" hidden>
+      <div class="sub-h" style="margin-top:4px">Cutter</div>
+      <div class="field" id="ckSizeField">
+        <label for="ckSize">Cookie size (longest side)</label><span class="num"><input type="number" id="ckSizeNum" min="30" max="200" step="1" value="80" inputmode="decimal" aria-label="Cookie size (longest side)"><span>mm</span></span>
+        <input type="range" id="ckSize" min="30" max="200" step="1" value="80">
+      </div>
+      <div class="field" id="ckHField">
+        <label for="ckH">Cutter height</label><span class="num"><input type="number" id="ckHNum" min="8" max="30" step="0.5" value="15" inputmode="decimal" aria-label="Cutter height"><span>mm</span></span>
+        <input type="range" id="ckH" min="8" max="30" step="0.5" value="15">
+      </div>
+      <div class="field" id="ckWallField">
+        <label for="ckWall">Wall thickness</label><span class="num"><input type="number" id="ckWallNum" min="0.8" max="3" step="0.1" value="1.2" inputmode="decimal" aria-label="Wall thickness"><span>mm</span></span>
+        <input type="range" id="ckWall" min="0.8" max="3" step="0.1" value="1.2">
+      </div>
+      <div class="field" id="ckBladeField">
+        <label for="ckBlade">Cutting edge</label><span class="num"><input type="number" id="ckBladeNum" min="0.4" max="1.5" step="0.05" value="0.6" inputmode="decimal" aria-label="Cutting edge"><span>mm</span></span>
+        <input type="range" id="ckBlade" min="0.4" max="1.5" step="0.05" value="0.6">
+      </div>
+      <div class="field" id="ckLipField">
+        <label for="ckLip">Lip width</label><span class="num"><input type="number" id="ckLipNum" min="0" max="8" step="0.5" value="3" inputmode="decimal" aria-label="Lip width"><span>mm</span></span>
+        <input type="range" id="ckLip" min="0" max="8" step="0.5" value="3">
+      </div>
+      <div class="field" id="ckLipHField">
+        <label for="ckLipH">Lip height</label><span class="num"><input type="number" id="ckLipHNum" min="0.6" max="3" step="0.1" value="1.6" inputmode="decimal" aria-label="Lip height"><span>mm</span></span>
+        <input type="range" id="ckLipH" min="0.6" max="3" step="0.1" value="1.6">
+      </div>
+      <div class="field" id="ckGapsField">
+        <label for="ckGaps">Fill gaps in the outline</label><span class="num"><input type="number" id="ckGapsNum" min="0" max="15" step="0.5" value="4" inputmode="decimal" aria-label="Fill gaps in the outline"><span>mm</span></span>
+        <input type="range" id="ckGaps" min="0" max="15" step="0.5" value="4">
+      </div>
+      <p class="hint">The cutter follows the outline of the art. Print it lip-down with no supports; the thin cutting edge ends up on top. Narrow gaps get filled so dough releases cleanly.</p>
+      <div class="sub-h">Stamp</div>
+      <label class="toggle"><input type="checkbox" id="ckStamp" checked> Make a matching stamp</label>
+      <div id="ckStampFields">
+      <div class="field" style="display:block"><span style="font-weight:500">Raise these colors as lines</span>
+      <div class="ck-lines" id="ckLines"></div></div>
+      <div class="field" id="ckBoostField">
+        <label for="ckBoost">Thicken lines</label><span class="num"><input type="number" id="ckBoostNum" min="0" max="1.5" step="0.05" value="0.4" inputmode="decimal" aria-label="Thicken lines"><span>mm</span></span>
+        <input type="range" id="ckBoost" min="0" max="1.5" step="0.05" value="0.4">
+      </div>
+      <div class="field" id="ckRelField">
+        <label for="ckRel">Line height</label><span class="num"><input type="number" id="ckRelNum" min="1" max="5" step="0.1" value="2.5" inputmode="decimal" aria-label="Line height"><span>mm</span></span>
+        <input type="range" id="ckRel" min="1" max="5" step="0.1" value="2.5">
+      </div>
+      <div class="field" id="ckSTField">
+        <label for="ckST">Stamp thickness</label><span class="num"><input type="number" id="ckSTNum" min="1.5" max="6" step="0.1" value="3" inputmode="decimal" aria-label="Stamp thickness"><span>mm</span></span>
+        <input type="range" id="ckST" min="1.5" max="6" step="0.1" value="3">
+      </div>
+      <div class="field" id="ckClrField">
+        <label for="ckClr">Gap to cutter</label><span class="num"><input type="number" id="ckClrNum" min="0.3" max="3" step="0.1" value="1" inputmode="decimal" aria-label="Gap to cutter"><span>mm</span></span>
+        <input type="range" id="ckClr" min="0.3" max="3" step="0.1" value="1">
+      </div>
+      <p class="hint">The stamp presses the lines into the dough after cutting. It is mirrored so the cookie reads the right way round, and sits just inside the cutter. Print it lines-up.</p>
+      </div>
+      </div>
+      <div id="coinOpts" hidden>
+      <div class="field" id="cDiaField">
+        <label for="cDia">Diameter</label><span class="num"><input type="number" id="cDiaNum" min="10" max="150" step="0.5" value="40" inputmode="decimal" aria-label="Diameter"><span>mm</span></span>
+        <input type="range" id="cDia" min="10" max="150" step="0.5" value="40">
+      </div>
+      <div class="field" id="cThickField">
+        <label for="cThick">Thickness</label><span class="num"><input type="number" id="cThickNum" min="0.8" max="10" step="0.1" value="3" inputmode="decimal" aria-label="Thickness"><span>mm</span></span>
+        <input type="range" id="cThick" min="0.8" max="10" step="0.1" value="3">
+      </div>
+      <div class="field" id="cRimWField">
+        <label for="cRimW">Rim width</label><span class="num"><input type="number" id="cRimWNum" min="0" max="10" step="0.1" value="2" inputmode="decimal" aria-label="Rim width"><span>mm</span></span>
+        <input type="range" id="cRimW" min="0" max="10" step="0.1" value="2">
+      </div>
+      <div class="field" id="cRimHField">
+        <label for="cRimH">Rim height above face</label><span class="num"><input type="number" id="cRimHNum" min="0" max="5" step="0.1" value="1" inputmode="decimal" aria-label="Rim height above face"><span>mm</span></span>
+        <input type="range" id="cRimH" min="0" max="5" step="0.1" value="1">
+      </div>
+      <div class="field">
+        <label for="cRimFil">Rim filament</label>
+        <select id="cRimFil"></select>
+      </div>
+      <div class="sub-h">Artwork</div>
+      <div class="styles" role="radiogroup" aria-label="Artwork style">
+        <input type="radio" name="cMode" id="cmRaise" value="raise" checked><label for="cmRaise"><svg viewBox="0 0 54 22" aria-hidden="true"><rect x="2" y="12" width="50" height="8" rx="1" fill="currentColor" opacity=".35"/><rect x="18" y="5" width="18" height="7" fill="#d4a04a"/></svg>Raised</label>
+        <input type="radio" name="cMode" id="cmEngrave" value="engrave"><label for="cmEngrave"><svg viewBox="0 0 54 22" aria-hidden="true"><path d="M2 8h16v5h18V8h16v12H2z" fill="currentColor" opacity=".35"/></svg>Engraved</label>
+        <input type="radio" name="cMode" id="cmInlay" value="inlay"><label for="cmInlay"><svg viewBox="0 0 54 22" aria-hidden="true"><path d="M2 8h16v5h18V8h16v12H2z" fill="currentColor" opacity=".35"/><rect x="18" y="8" width="18" height="5" fill="#d4a04a"/></svg>Inlaid</label>
+      </div>
+      <p class="hint" id="cModeHint">Art stands above the face. Its height is set in step 4.</p>
+      <div class="field" id="cDepthField">
+        <label for="cDepth">Engrave depth</label><span class="num"><input type="number" id="cDepthNum" min="0.2" max="5" step="0.1" value="0.8" inputmode="decimal" aria-label="Engrave depth"><span>mm</span></span>
+        <input type="range" id="cDepth" min="0.2" max="5" step="0.1" value="0.8">
+      </div>
+      <div class="field" id="cScaleField">
+        <label for="cScale">Art size</label><span class="num"><input type="number" id="cScaleNum" min="10" max="150" step="1" value="100" inputmode="decimal" aria-label="Art size"><span>%</span></span>
+        <input type="range" id="cScale" min="10" max="150" step="1" value="100">
+      </div>
+      <div class="field" id="cOffXField">
+        <label for="cOffX">Move art right</label><span class="num"><input type="number" id="cOffXNum" min="-40" max="40" step="0.5" value="0" inputmode="decimal" aria-label="Move art right"><span>mm</span></span>
+        <input type="range" id="cOffX" min="-40" max="40" step="0.5" value="0">
+      </div>
+      <div class="field" id="cOffYField">
+        <label for="cOffY">Move art up</label><span class="num"><input type="number" id="cOffYNum" min="-40" max="40" step="0.5" value="0" inputmode="decimal" aria-label="Move art up"><span>mm</span></span>
+        <input type="range" id="cOffY" min="-40" max="40" step="0.5" value="0">
+      </div>
+      <p class="hint">100% fits the art inside the rim with a 1 mm gap. Parts that spill past the rim are trimmed.</p>
+      </div>
+      <div id="kcOpts" hidden>
+      <div id="kBookSec" hidden>
+      <div class="sub-h" style="margin-top:4px">Size</div>
+      <div class="field" id="bLenField">
+        <label for="bLen">Length</label><span class="num"><input type="number" id="bLenNum" min="60" max="250" step="1" value="150" inputmode="decimal" aria-label="Length"><span>mm</span></span>
+        <input type="range" id="bLen" min="60" max="250" step="1" value="150">
+      </div>
+      <div class="field" id="bWidField">
+        <label for="bWid">Width</label><span class="num"><input type="number" id="bWidNum" min="20" max="90" step="0.5" value="40" inputmode="decimal" aria-label="Width"><span>mm</span></span>
+        <input type="range" id="bWid" min="20" max="90" step="0.5" value="40">
+      </div>
+      <div class="field" id="bCornerField">
+        <label for="bCorner">Corner rounding</label><span class="num"><input type="number" id="bCornerNum" min="0" max="15" step="0.5" value="4" inputmode="decimal" aria-label="Corner rounding"><span>mm</span></span>
+        <input type="range" id="bCorner" min="0" max="15" step="0.5" value="4">
+      </div>
+      <label class="toggle"><input type="checkbox" id="bTassel" checked> Tassel hole at the top</label>
+      <div id="bTasselFields">
+      <div class="field" id="bHoleField">
+        <label for="bHole">Hole diameter</label><span class="num"><input type="number" id="bHoleNum" min="2" max="12" step="0.5" value="5" inputmode="decimal" aria-label="Hole diameter"><span>mm</span></span>
+        <input type="range" id="bHole" min="2" max="12" step="0.5" value="5">
+      </div>
+      <div class="field" id="bHoleYField">
+        <label for="bHoleY">Hole center from top edge</label><span class="num"><input type="number" id="bHoleYNum" min="4" max="40" step="0.5" value="8" inputmode="decimal" aria-label="Hole center from top edge"><span>mm</span></span>
+        <input type="range" id="bHoleY" min="4" max="40" step="0.5" value="8">
+      </div>
+      </div>
+      </div>
+      <div id="kShapeSec">
+      <div class="sub-h" style="margin-top:4px">Shape</div>
+      <div class="shapes" role="radiogroup" aria-label="Shape"><input type="radio" name="kShape" id="ksOutline" value="outline" checked><label for="ksOutline"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5c2.4 0 4 1.8 4 4 0 1.1-.4 2.1-1.1 2.8 2.1.9 3.6 2.9 3.6 5.4v3.8c0 .9-.7 1.5-1.5 1.5H7c-.8 0-1.5-.6-1.5-1.5v-3.8c0-2.5 1.5-4.5 3.6-5.4C8.4 8.6 8 7.6 8 6.5c0-2.2 1.6-4 4-4z"/></svg>Outline</label><input type="radio" name="kShape" id="ksCircle" value="circle"><label for="ksCircle"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/></svg>Circle</label><input type="radio" name="kShape" id="ksSquare" value="square"><label for="ksSquare"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="2.5" y="2.5" width="19" height="19" rx="4.5"/></svg>Square</label><input type="radio" name="kShape" id="ksStar" value="star"><label for="ksStar"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="12.0,3.0 9.3,9.3 2.5,9.9 7.6,14.4 6.1,21.1 12.0,17.6 17.9,21.1 16.4,14.4 21.5,9.9 14.7,9.3" stroke-linejoin="round" stroke-width="1.6" stroke="currentColor"/></svg>Star</label><input type="radio" name="kShape" id="ksCloud" value="cloud"><label for="ksCloud"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.5 19.5h11.2a4.3 4.3 0 0 0 .9-8.5 6.3 6.3 0 0 0-12.1-1.2A4.9 4.9 0 0 0 6.5 19.5z"/></svg>Cloud</label><input type="radio" name="kShape" id="ksHexagon" value="hexagon"><label for="ksHexagon"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="22,12 17,20.7 7,20.7 2,12 7,3.3 17,3.3" stroke-linejoin="round" stroke-width="1.4" stroke="currentColor"/></svg>Hexagon</label></div>
+      <p class="hint" id="kShapeHint">Follows the outline of the art with a small border.</p>
+      </div>
+      <div class="field" id="kSizeField">
+        <label for="kSize">Size (longest side)</label><span class="num"><input type="number" id="kSizeNum" min="15" max="250" step="0.5" value="50" inputmode="decimal" aria-label="Size (longest side)"><span>mm</span></span>
+        <input type="range" id="kSize" min="15" max="250" step="0.5" value="50">
+      </div>
+      <div class="field" id="kThickField">
+        <label for="kThick">Thickness</label><span class="num"><input type="number" id="kThickNum" min="1.5" max="10" step="0.1" value="3.5" inputmode="decimal" aria-label="Thickness"><span>mm</span></span>
+        <input type="range" id="kThick" min="1.5" max="10" step="0.1" value="3.5">
+      </div>
+      <div class="field" id="kDepthField">
+        <label for="kDepth">Color depth</label><span class="num"><input type="number" id="kDepthNum" min="0.2" max="10" step="0.1" value="1" inputmode="decimal" aria-label="Color depth"><span>mm</span></span>
+        <input type="range" id="kDepth" min="0.2" max="10" step="0.1" value="1">
+      </div>
+      <p class="hint">Colors fill the face of the model, flush with the surface. Set this to the thickness for colors all the way through. More depth means more layers of each color, so light colors cover darker ones better.</p>
+      <div class="field" id="kMinLineField">
+        <label for="kMinLine">Minimum line width</label><span class="num"><input type="number" id="kMinLineNum" min="0" max="1.2" step="0.05" value="0.8" inputmode="decimal" aria-label="Minimum line width"><span>mm</span></span>
+        <input type="range" id="kMinLine" min="0" max="1.2" step="0.05" value="0.8">
+      </div>
+      <p class="hint">Thin details (outlines, mouths, seams) narrower than this are widened so the nozzle can print them. 0.8 mm gives a 0.4 mm nozzle room for two lines, which prints clean, even outlines; 0 turns it off.</p>
+      <div id="kFaceDownRow">
+      <label class="toggle"><input type="checkbox" id="kFaceDown"> Print face down (art on the build plate)</label>
+      <p class="hint" id="kFaceDownHint">Files come out flipped so the colors print first, flat on the plate: crisp edges and the plate's finish on the art. The preview still shows the art side.</p>
+      </div>
+      <div class="field" id="kMarginField">
+        <label for="kMargin">Space around art</label><span class="num"><input type="number" id="kMarginNum" min="0" max="10" step="0.1" value="2.5" inputmode="decimal" aria-label="Space around art"><span>mm</span></span>
+        <input type="range" id="kMargin" min="0" max="10" step="0.1" value="2.5">
+      </div>
+      <div class="field" id="kGapsField">
+        <label for="kGaps">Fill gaps in the outline</label><span class="num"><input type="number" id="kGapsNum" min="0" max="15" step="0.5" value="4" inputmode="decimal" aria-label="Fill gaps in the outline"><span>mm</span></span>
+        <input type="range" id="kGaps" min="0" max="15" step="0.5" value="4">
+      </div>
+      <div class="field">
+        <label for="kRimFil" id="kRimFilLbl">Surround filament</label>
+        <select id="kRimFil"></select>
+      </div>
+      <div id="kPlace" hidden>
+      <div class="sub-h">Art placement</div>
+      <div class="field" id="kScaleField">
+        <label for="kScale">Art size</label><span class="num"><input type="number" id="kScaleNum" min="10" max="150" step="1" value="100" inputmode="decimal" aria-label="Art size"><span>%</span></span>
+        <input type="range" id="kScale" min="10" max="150" step="1" value="100">
+      </div>
+      <div class="field" id="kOffXField">
+        <label for="kOffX">Move art right</label><span class="num"><input type="number" id="kOffXNum" min="-40" max="40" step="0.5" value="0" inputmode="decimal" aria-label="Move art right"><span>mm</span></span>
+        <input type="range" id="kOffX" min="-40" max="40" step="0.5" value="0">
+      </div>
+      <div class="field" id="kOffYField">
+        <label for="kOffY">Move art up</label><span class="num"><input type="number" id="kOffYNum" min="-40" max="40" step="0.5" value="0" inputmode="decimal" aria-label="Move art up"><span>mm</span></span>
+        <input type="range" id="kOffY" min="-40" max="40" step="0.5" value="0">
+      </div>
+      <p class="hint">100% is the largest the art fits inside the shape. Anything past the edge is trimmed.</p>
+      </div>
+      <div id="kRingSec">
+      <div class="sub-h">Key ring</div>
+      <div class="field">
+        <label for="kHolePos">Ring position</label>
+        <select id="kHolePos"><option value="top" selected>Top</option><option value="top-left">Top left</option><option value="top-right">Top right</option><option value="left">Left</option><option value="right">Right</option><option value="none">No ring</option></select>
+      </div>
+      <div id="kHoleFields">
+      <div class="field" id="kHoleField">
+        <label for="kHole">Hole diameter</label><span class="num"><input type="number" id="kHoleNum" min="2" max="10" step="0.1" value="4" inputmode="decimal" aria-label="Hole diameter"><span>mm</span></span>
+        <input type="range" id="kHole" min="2" max="10" step="0.1" value="4">
+      </div>
+      <div class="field" id="kRingField">
+        <label for="kRing">Ring width</label><span class="num"><input type="number" id="kRingNum" min="1" max="6" step="0.1" value="2.5" inputmode="decimal" aria-label="Ring width"><span>mm</span></span>
+        <input type="range" id="kRing" min="1" max="6" step="0.1" value="2.5">
+      </div>
+      </div>
+      </div>
+      <div id="kMagSec" hidden>
+      <div class="sub-h">Magnets</div>
+      <div class="field" id="mDiaField">
+        <label for="mDia">Magnet diameter</label><span class="num"><input type="number" id="mDiaNum" min="3" max="30" step="0.5" value="10" inputmode="decimal" aria-label="Magnet diameter"><span>mm</span></span>
+        <input type="range" id="mDia" min="3" max="30" step="0.5" value="10">
+      </div>
+      <div class="field" id="mThickField">
+        <label for="mThick">Magnet thickness</label><span class="num"><input type="number" id="mThickNum" min="0.5" max="10" step="0.1" value="3" inputmode="decimal" aria-label="Magnet thickness"><span>mm</span></span>
+        <input type="range" id="mThick" min="0.5" max="10" step="0.1" value="3">
+      </div>
+      <div class="field">
+        <label for="mCount">Number of magnets</label>
+        <select id="mCount"><option value="1" selected>1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>
+      </div>
+      <div class="field">
+        <label for="mStyle">Pocket</label>
+        <select id="mStyle"><option value="open" selected>Open on the back (glue in)</option><option value="hidden">Hidden inside (pause to insert)</option></select>
+      </div>
+      <div class="field" id="mClrField">
+        <label for="mClr">Fit clearance</label><span class="num"><input type="number" id="mClrNum" min="0" max="0.6" step="0.05" value="0.15" inputmode="decimal" aria-label="Fit clearance"><span>mm</span></span>
+        <input type="range" id="mClr" min="0" max="0.6" step="0.05" value="0.15">
+      </div>
+      <p class="hint" id="mHint">Pockets are cut into the back, sized to the magnet plus the clearance.</p>
+      </div>
+      <div id="kFillSec">
+      <div class="sub-h">Filler shapes</div>
+      <label class="toggle"><input type="checkbox" id="fOn"> Scatter shapes in the empty space</label>
+      <div id="fFields" hidden>
+      <div class="field">
+        <label for="fShape">Shape</label>
+        <select id="fShape"><option value="star4" selected>4-pointed stars</option><option value="star5">5-pointed stars</option><option value="heart">Hearts</option><option value="dot">Dots</option><option value="mix">Mix of all</option></select>
+      </div>
+      <div class="field" id="fCountField">
+        <label for="fCount">Number of shapes (up to)</label><span class="num"><input type="number" id="fCountNum" min="1" max="150" step="1" value="30" inputmode="decimal" aria-label="Number of shapes (up to)"></span>
+        <input type="range" id="fCount" min="1" max="150" step="1" value="30">
+      </div>
+      <div class="field" id="fMinField">
+        <label for="fMin">Smallest</label><span class="num"><input type="number" id="fMinNum" min="2" max="20" step="0.5" value="3" inputmode="decimal" aria-label="Smallest"><span>mm</span></span>
+        <input type="range" id="fMin" min="2" max="20" step="0.5" value="3">
+      </div>
+      <div class="field" id="fMaxField">
+        <label for="fMax">Largest</label><span class="num"><input type="number" id="fMaxNum" min="2" max="30" step="0.5" value="8" inputmode="decimal" aria-label="Largest"><span>mm</span></span>
+        <input type="range" id="fMax" min="2" max="30" step="0.5" value="8">
+      </div>
+      <div class="field" id="fGapField">
+        <label for="fGap">Space between</label><span class="num"><input type="number" id="fGapNum" min="0.5" max="10" step="0.5" value="2" inputmode="decimal" aria-label="Space between"><span>mm</span></span>
+        <input type="range" id="fGap" min="0.5" max="10" step="0.5" value="2">
+      </div>
+      <div class="field">
+        <label for="fFil">Shape filament</label>
+        <select id="fFil"></select>
+      </div>
+      <input type="hidden" id="fSeed" value="1">
+      <div class="btns" style="margin-top:8px"><button type="button" class="btn" id="fShuffle">Shuffle <small>new random layout</small></button></div>
+      <p class="hint" id="fHint">Shapes fill the open face around the art, flush with the surface, in their own filament.</p>
+      </div>
+      </div>
+      <div id="kCoastSec" hidden>
+      <div class="sub-h">Rim</div>
+      <div class="field" id="qRimWField">
+        <label for="qRimW">Rim width</label><span class="num"><input type="number" id="qRimWNum" min="0" max="15" step="0.5" value="4" inputmode="decimal" aria-label="Rim width"><span>mm</span></span>
+        <input type="range" id="qRimW" min="0" max="15" step="0.5" value="4">
+      </div>
+      <div class="field" id="qRimHField">
+        <label for="qRimH">Rim height above face</label><span class="num"><input type="number" id="qRimHNum" min="0" max="5" step="0.1" value="1.5" inputmode="decimal" aria-label="Rim height above face"><span>mm</span></span>
+        <input type="range" id="qRimH" min="0" max="5" step="0.1" value="1.5">
+      </div>
+      <div class="field">
+        <label for="qRimFil">Rim filament</label>
+        <select id="qRimFil"></select>
+      </div>
+      <label class="toggle"><input type="checkbox" id="qPad"> Recess underneath for a cork or felt pad</label>
+      <div id="qPadFields" hidden>
+      <div class="field" id="qPadDField">
+        <label for="qPadD">Recess depth</label><span class="num"><input type="number" id="qPadDNum" min="0.4" max="3" step="0.1" value="1" inputmode="decimal" aria-label="Recess depth"><span>mm</span></span>
+        <input type="range" id="qPadD" min="0.4" max="3" step="0.1" value="1">
+      </div>
+      <div class="field" id="qPadInField">
+        <label for="qPadIn">Recess inset from edge</label><span class="num"><input type="number" id="qPadInNum" min="1" max="15" step="0.5" value="3" inputmode="decimal" aria-label="Recess inset from edge"><span>mm</span></span>
+        <input type="range" id="qPadIn" min="1" max="15" step="0.5" value="3">
+      </div>
+      </div>
+      </div>
+      </div>
+      <div class="field">
+        <label for="smooth">Smooth edges</label><span class="num"><input type="number" id="smoothNum" min="0" max="1" step="0.05" value="0.35" inputmode="decimal" aria-label="Smooth edges"><span>mm</span></span>
+        <input type="range" id="smooth" min="0" max="1" step="0.05" value="0.35">
+      </div>
+      <p class="hint">Removes the pixel stair-steps from walls and color edges. Higher values also soften small details.</p>
+      <div class="fname">
+        <label for="fileName">File name</label>
+        <div class="box"><input type="text" id="fileName" value="tray" spellcheck="false" autocomplete="off" maxlength="80"><small id="fileExt">.3mf</small></div>
+      </div>
+      <div class="slots" id="slotBox" hidden>
+        <div class="slots-head">Filament slots <small id="slotSrc">for Orca Slicer</small><button type="button" id="slotRefresh" class="orca-only" title="Read the filament list from Orca again">Refresh</button></div>
+        <div id="slotRows"></div>
+      </div>
+      <div class="btns">
+        <button class="btn primary orca-only" id="sendOrca" disabled>Send to plate <small id="sendNote">one object, parts on their slots</small></button>
+        <button class="btn primary web-only" id="dl3mf" disabled>Download 3MF <small id="dl3mfNote">one part per color</small></button>
+        <button class="btn web-only" id="dlOrca" disabled>Download for Orca Slicer <small>.3mf with filament slots set</small></button>
+        <button class="btn web-only" id="dlZip" disabled>Download all parts <small>.zip of STLs + 3MF</small></button>
+        <button class="btn web-only" id="dlStl" disabled>Download single STL <small id="dlStlNote">no colors</small></button>
+      </div>
+      <p class="hint web-only" id="dlHint">In your slicer, load the 3MF as one object and assign each named part to a filament. The Orca Slicer file arrives with every part already on its slot.</p>
+      <p class="hint orca-only" id="orcaHint">Each part lands on the Orca filament slot picked above. If the plate already has objects, Orca asks how to open the file: choose <b>Import geometry only</b>. New objects land in the middle of the plate; press <b>A</b> in Orca to arrange.</p>
+    </section>
+  </aside>
+
+  <main class="stage">
+    <div class="topbar">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tabImg" aria-selected="true" aria-controls="imgView">Image</button>
+      <button role="tab" id="tab3d" aria-selected="false" aria-controls="glView">3D model</button>
+    </div>
+    <div class="hist">
+      <button type="button" id="undoBtn" disabled title="Undo (Ctrl+Z)" aria-label="Undo"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 3 2.5 6l3 3"/><path d="M2.5 6h7a4 4 0 0 1 0 8H7"/></svg>Undo</button>
+      <button type="button" id="redoBtn" disabled title="Redo (Ctrl+Shift+Z)" aria-label="Redo"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10.5 3 3 3-3 3"/><path d="M13.5 6h-7a4 4 0 0 0 0 8H9"/></svg>Redo</button>
+      <button type="button" id="resetBtn" class="orca-only" title="Clear everything and start over" aria-label="Reset"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 8a5.5 5.5 0 1 0 1.6-3.9"/><path d="M2.5 2.5v3h3"/></svg><span>Reset</span></button>
+    </div>
+    </div>
+    <div class="view">
+      <div id="imgView" role="tabpanel" aria-labelledby="tabImg">
+        <div class="empty" id="emptyMsg"><p><b>No image yet</b>Add character art on the left to start building a tray.</p></div>
+        <canvas id="preview" hidden></canvas>
+      </div>
+      <div id="glView" role="tabpanel" aria-labelledby="tab3d" hidden></div>
+    </div>
+    <div class="tools" id="clickHint" hidden>
+      <div class="seg2" role="group" aria-label="Click mode">
+        <button type="button" id="toolSelect" aria-pressed="true">Select</button>
+        <button type="button" id="toolPaint" aria-pressed="false">Paint</button>
+      </div>
+      <span class="chip" id="paintChip" hidden><input type="color" id="paintColor" value="#f28c28" aria-label="Paint color"></span>
+      <span class="psw" id="paintSw" hidden></span>
+      <span class="tip" id="toolTip">Click a part to edit it</span>
+    </div>
+    <div class="focuschip" id="focusChip" hidden><i id="focusSw"></i><span id="focusTxt"></span><button type="button" id="focusClear">Show all</button></div>
+    <div class="pop" id="pop" hidden role="dialog" aria-labelledby="popTitle">
+      <div class="pop-head"><span class="src" id="popSrc"></span><b id="popTitle"></b><button class="pop-close" id="popClose" aria-label="Close">×</button></div>
+      <div class="seg" role="radiogroup" aria-label="Apply to">
+        <input type="radio" name="scope" id="scopePiece" value="piece" checked><label for="scopePiece">This piece</label>
+        <input type="radio" name="scope" id="scopeAll" value="all"><label for="scopeAll" id="scopeAllLbl">All matching</label>
+      </div>
+      <div class="pop-row">
+        <span class="chip"><input type="color" id="popColor" aria-label="Filament color"></span>
+        <span>New color</span>
+        <label style="margin-left:auto" id="popHRow">Height <input type="number" id="popH" min="0.2" max="20" step="0.2" aria-label="Height above base in mm"> mm</label>
+      </div>
+      <div class="pop-sub">Or use a filament you already have</div>
+      <div class="swatches" id="popSw"></div>
+    </div>
+    <div class="status" id="status" aria-live="polite"></div>
+    <div class="dims" id="dims"></div>
+  </main>
+</div>
+
+<div class="sp-back" id="spBack" hidden>
+  <div class="sp" role="dialog" aria-modal="true" aria-labelledby="spTitle">
+    <div class="sp-head"><h3 id="spTitle">Choose filament</h3><button class="pop-close" id="spClose" aria-label="Close">×</button></div>
+    <div class="sp-filters">
+      <input type="search" id="spQ" placeholder="Search, e.g. sunlu pla black" aria-label="Search filaments" autocomplete="off">
+      <select id="spBrand" aria-label="Brand"></select>
+      <select id="spMat" aria-label="Material"></select>
+    </div>
+    <div class="sp-sub"><span id="spCount"></span><label><input type="checkbox" id="spClosest" checked> Closest to current color first</label></div>
+    <div class="sp-recent" id="spRecent" aria-label="Recently used"></div>
+    <div class="sp-list" id="spList"></div>
+    <div class="sp-foot">
+      <span class="custom"><span class="chip"><input type="color" id="spCustom" data-native value="#888888" aria-label="Custom color"></span><button type="button" class="use" id="spUseCustom">Use custom color</button></span>
+      <span class="src" id="spSrc">Filament data: SpoolmanDB</span>
+    </div>
+  </div>
+</div>
+
+<script id="spoolmandb" type="application/json">/*SPOOLMANDB*/</script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+// TrayCore: image -> labeled regions -> watertight tray meshes. No DOM dependencies.
+/*CORE*/
+
+</script>
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const C = window.TrayCore;
+const S = {
+  name: 'tray', img: null, bgMask: null, prep: null, stats: [], regions: [], mirror: false,
+  tray: null, buildTimer: 0, buildToken: 0, view: 'img', sel: null,
+  orcaSlots: null, slotPick: {}, maxSlots: 16,
+};
+// Running inside the Orca Slicer plugin window? Orca injects window.orca before the page loads.
+const ORCA = typeof window.orca === 'object' && window.orca !== null && typeof window.orca.postMessage === 'function';
+// Reset in Orca rewrites this document in place, so the old copy of this script must go quiet.
+const RUN_ID = (window.__mgRun = (window.__mgRun || 0) + 1), alive = () => window.__mgRun === RUN_ID;
+
+// ---------- helpers ----------
+const status = t => { $('status').textContent = t || ''; };
+const setErr = t => { $('err').textContent = t || ''; };
+const enable = (id, on) => $(id).setAttribute('aria-disabled', on ? 'false' : 'true');
+const hexToRgb = h => [1, 3, 5].map(o => parseInt(h.substr(o, 2), 16));
+const later = fn => new Promise(r => setTimeout(() => r(fn()), 16));
+
+function colorName(hex) {
+  const [r, g, b] = hexToRgb(hex).map(v => v / 255);
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn;
+  const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+  let h = 0;
+  if (d) { if (mx === r) h = ((g - b) / d) % 6; else if (mx === g) h = (b - r) / d + 2; else h = (r - g) / d + 4; h = (h * 60 + 360) % 360; }
+  if (l < 0.12 || (l < 0.25 && s < 0.25)) return 'Black';
+  if (l > 0.88 && d < 0.12) return 'White';
+  if (s < 0.12 || d < 0.06) return l < 0.4 ? 'Dark gray' : l < 0.7 ? 'Gray' : 'Light gray';
+  let n = h < 15 || h >= 345 ? 'Red' : h < 40 ? 'Orange' : h < 65 ? 'Yellow' : h < 160 ? 'Green' : h < 195 ? 'Teal' : h < 255 ? 'Blue' : h < 290 ? 'Purple' : 'Pink';
+  if (n === 'Orange' && (l < 0.45 || s < 0.55)) n = 'Brown';
+  if (n === 'Yellow' && l < 0.35) n = 'Olive';
+  if (n === 'Red' && l < 0.3) n = 'Maroon';
+  const tone = l < 0.3 ? 'Dark ' : l > 0.78 && n !== 'Yellow' ? 'Light ' : '';
+  return tone + n.toLowerCase().replace(/^./, c => tone ? c : c.toUpperCase());
+}
+
+// ---------- 1. load ----------
+function loadFile(file) {
+  if (!file || !file.type.startsWith('image/')) { setErr('That file is not an image. Choose a PNG, JPG or SVG.'); return; }
+  const isSvg = file.type === 'image/svg+xml' || /\.svg$/i.test(file.name || '');
+  setErr('');
+  S.name = (file.name || 'tray').replace(/\.[^.]+$/, '').replace(/[^\w-]+/g, '_').slice(0, 60) || 'tray';
+  $('fileName').value = S.name + GEN[S.gen].suffix;
+  const im = new Image();
+  let url;
+  im.onload = () => {
+    const max = 1600, sc = Math.min(1, max / Math.max(im.naturalWidth, im.naturalHeight));
+    const cv = document.createElement('canvas');
+    cv.width = Math.round(im.naturalWidth * sc); cv.height = Math.round(im.naturalHeight * sc);
+    const cx = cv.getContext('2d'); cx.drawImage(im, 0, 0, cv.width, cv.height);
+    S.img = cx.getImageData(0, 0, cv.width, cv.height);
+    URL.revokeObjectURL(url);
+    S.regions = []; S.rimCustom = freshRimCustom(); S.textC.touched = false; clearHistory();
+    runBackground();
+  };
+  im.onerror = () => setErr(isSvg ? 'This SVG could not be drawn. Try exporting it again or saving it as PNG.' : 'The image could not be read. Try saving it as PNG.');
+  if (!isSvg) { url = URL.createObjectURL(file); im.src = url; return; }
+  // SVGs: give the drawing an explicit pixel size (long side 1600) so it rasterizes crisply
+  file.text().then(txt => {
+    const doc = new DOMParser().parseFromString(txt, 'image/svg+xml'), svg = doc.documentElement;
+    if (!svg || svg.nodeName.toLowerCase() !== 'svg' || doc.querySelector('parsererror')) throw new Error('bad svg');
+    const vb = (svg.getAttribute('viewBox') || '').trim().split(/[\s,]+/).map(Number);
+    let w = parseFloat(svg.getAttribute('width')), h = parseFloat(svg.getAttribute('height'));
+    if (vb.length === 4 && vb[2] > 0 && vb[3] > 0) { if (!(w > 0) || !(h > 0) || /%/.test(svg.getAttribute('width') || '')) { w = vb[2]; h = vb[3]; } }
+    else { if (!(w > 0) || !(h > 0)) { w = 1000; h = 1000; } svg.setAttribute('viewBox', `0 0 ${w} ${h}`); }
+    const sc = 1600 / Math.max(w, h);
+    svg.setAttribute('width', Math.round(w * sc)); svg.setAttribute('height', Math.round(h * sc));
+    if (!svg.getAttribute('xmlns')) svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(doc)], { type: 'image/svg+xml' }));
+    im.src = url;
+  }).catch(() => setErr('This SVG could not be read. Try exporting it again or saving it as PNG.'));
+}
+$('file').addEventListener('change', e => loadFile(e.target.files[0]));
+$('drop').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('file').click(); } });
+['dragenter', 'dragover'].forEach(ev => $('drop').addEventListener(ev, e => { e.preventDefault(); $('drop').classList.add('over'); }));
+['dragleave', 'drop'].forEach(ev => $('drop').addEventListener(ev, e => { e.preventDefault(); $('drop').classList.remove('over'); }));
+$('drop').addEventListener('drop', e => loadFile(e.dataTransfer.files[0]));
+window.addEventListener('paste', e => { const f = [...(e.clipboardData?.files || [])].find(f => f.type.startsWith('image/')); if (f) loadFile(f); });
+
+// ---------- 2. background ----------
+async function runBackground() {
+  if (!S.img) return;
+  status('Removing background…');
+  await later(() => {
+    try {
+      const { mask } = C.removeBackground(S.img, +$('tol').value);
+      S.prep = C.cropAndScale(S.img, mask, 900, false);
+      setErr('');
+    } catch (e) { S.prep = null; setErr(e.message); }
+  });
+  if (!S.prep) { status(''); return; }
+  ['s2', 's3', 's4', 'sText', 's5'].forEach(id => enable(id, true));
+  $('clickHint').hidden = false;
+  drawThumbs();
+  await runColors(true);
+}
+let tolTimer;
+$('tol').addEventListener('input', () => { clearTimeout(tolTimer); tolTimer = setTimeout(runBackground, 250); });
+
+// ---------- 3. mirror ----------
+function subjectCanvas(mirror, useLabels, sel) {
+  const p = S.prep, cv = document.createElement('canvas');
+  cv.width = p.width; cv.height = p.height;
+  const id = new ImageData(p.width, p.height);
+  const lut = useLabels ? S.regions.map(r => { const e = effectiveRegion(r); return hexToRgb(e.flat ? $('baseColor').value : e.filament); }) : null;
+  for (let y = 0; y < p.height; y++) for (let x = 0; x < p.width; x++) {
+    const si = y * p.width + x, di = y * p.width + (mirror ? p.width - 1 - x : x);
+    if (!p.mask[si]) continue;
+    if (useLabels && p.labels) {
+      const l = p.labels[si]; const reg = S.regions[l];
+      if (reg && effectiveRegion(reg).flat) { id.data.set([...hexToRgb($('baseColor').value), 255], di * 4); continue; }
+      if (l >= 0) { id.data.set([...lut[l], 255], di * 4); continue; }
+    }
+    id.data.set(p.data.subarray(si * 4, si * 4 + 3), di * 4); id.data[di * 4 + 3] = 255;
+  }
+  if (sel) {
+    // dim everything except the selected piece
+    const keep = new Uint8Array(p.width * p.height);
+    for (const i of sel) { const y = (i / p.width) | 0, x = i % p.width; keep[y * p.width + (mirror ? p.width - 1 - x : x)] = 1; }
+    for (let i = 0; i < keep.length; i++) if (!keep[i] && id.data[i * 4 + 3]) {
+      id.data[i * 4] = id.data[i * 4] * 0.35 + 35 * 0.65; id.data[i * 4 + 1] = id.data[i * 4 + 1] * 0.35 + 39 * 0.65; id.data[i * 4 + 2] = id.data[i * 4 + 2] * 0.35 + 46 * 0.65;
+    }
+  }
+  cv.getContext('2d').putImageData(id, 0, 0);
+  return cv;
+}
+function drawThumbs() {
+  for (const [cid, m] of [['thumbA', false], ['thumbB', true]]) {
+    const src = subjectCanvas(m, false), t = $(cid);
+    const s = Math.min(240 / src.width, 240 / src.height);
+    t.width = Math.round(src.width * s); t.height = Math.round(src.height * s);
+    t.getContext('2d').drawImage(src, 0, 0, t.width, t.height);
+  }
+}
+document.querySelectorAll('input[name=mirror]').forEach(r => r.addEventListener('change', () => {
+  S.mirror = $('mYes').checked; closePop(); drawPreview(); scheduleBuild();
+}));
+
+// ---------- 4. colors ----------
+async function runColors(resetRegions) {
+  const p = S.prep; if (!p) return;
+  closePop(); S.focus = null; $('focusChip').hidden = true;
+  status('Finding colors…');
+  await later(() => {
+    const k = +$('kc').value;
+    let { labels, k: kk } = C.kmeans(p, p.mask, k);
+    if ($('simplifyColors').checked) {
+      // line art: fold anti-aliasing greys and near-duplicate shades into the real colors
+      labels = C.modeFilter(labels, p.width, p.height, kk, 1);
+      ({ labels, k: kk } = C.simplifyClusters(p, labels, p.width, p.height, kk));
+    }
+    labels = C.modeFilter(labels, p.width, p.height, kk, 2);
+    const mmPerPx = artMmPerPx();
+    labels = C.mergeSmall(labels, p.width, p.height, kk, Math.max(1, Math.round(+$('speck').value / (mmPerPx * mmPerPx))));
+    p.labels = labels;
+    const stats = C.regionStats(p, labels, kk);
+    const old = S.regions;
+    // order regions dark -> light so the outline comes first
+    const order = stats.slice().sort((a, b) => a.lightness - b.lightness);
+    const remap = new Map(order.map((s, i) => [s.index, i]));
+    for (let i = 0; i < labels.length; i++) if (labels[i] >= 0) labels[i] = remap.get(labels[i]);
+    S.stats = order.map((s, i) => ({ ...s, index: i }));
+    const darkest = 0;
+    S.regions = S.stats.map((s, i) => {
+      // keep a user's choices when the detected color barely moved
+      const prev = !resetRegions && old.find(o => o.source === s.color);
+      if (prev) return { ...prev, pixels: s.pixels };
+      return { source: s.color, name: colorName(s.color), filament: s.color, height: 3, merge: -1, pixels: s.pixels };
+    });
+    if (resetRegions) { $('baseColor').value = S.stats[0] ? S.stats[0].color : '#1a1a1a'; S.baseSpool = null; $('baseSpool').textContent = ''; }
+  });
+  renderRegions(); renderRimOptions(); drawPreview(); scheduleBuild();
+}
+let kTimer;
+$('simplifyColors').addEventListener('change', () => runColors(true));
+$('kc').addEventListener('input', () => { clearTimeout(kTimer); kTimer = setTimeout(() => runColors(true), 250); });
+$('speck').addEventListener('input', () => { clearTimeout(kTimer); kTimer = setTimeout(() => runColors(false), 250); });
+
+// a region's effective settings after following merges (merge: -1 own, -2 flat, n = into region n)
+function resolve(i, seen = new Set()) {
+  const r = S.regions[i]; if (!r) return -1;
+  if (r.merge === -2) return -2;
+  if (r.merge < 0 || seen.has(i)) return i;
+  seen.add(i); return resolve(r.merge, seen);
+}
+function effectiveRegion(r) {
+  const i = S.regions.indexOf(r), t = resolve(i);
+  if (t === -2) return { flat: true };
+  return S.regions[t];
+}
+
+function renderRegions() {
+  if (typeof renderCookieLines === 'function') renderCookieLines();
+  const box = $('regions'); box.innerHTML = '';
+  const total = S.regions.reduce((s, r) => s + r.pixels, 0) || 1;
+  S.regions.forEach((r, i) => {
+    if (!(r.pixels > 0)) return; // pieces moved into another color leave an empty entry behind
+    const el = document.createElement('div');
+    el.dataset.i = i;
+    el.className = 'region' + (r.merge !== -1 ? ' merged' : '') + (S.sel && S.sel.label === i ? ' active' : '');
+    const opts = ['<option value="-1">Own filament</option>', '<option value="-2">Leave flat (base)</option>']
+        .concat(S.regions.map((o, j) => j === i || !(o.pixels > 0) ? '' : `<option value="${j}">Same as ${escapeHtml(o.name)}</option>`)).join('');
+    el.innerHTML = `
+      <span class="chip"><input type="color" value="${r.filament}" aria-label="Filament color for ${escapeHtml(r.name)}"></span>
+      <div class="top"><span class="src" style="background:${r.source}" title="Detected ${r.source}"></span>
+        <input class="name" value="${escapeHtml(r.name)}" aria-label="Region name"></div>
+      <div class="row">
+        <select aria-label="Filament for ${escapeHtml(r.name)}">${opts}</select>
+        <label${raisedArt() ? '' : ' hidden'}>Height <input type="number" min="0.2" max="20" step="0.2" value="${heightOf(r)}" aria-label="Height above base in mm"> mm</label>
+        <span>${(r.pixels / total * 100).toFixed(0)}%</span>
+      </div>`;
+    const [colorIn, nameIn, sel, hIn] = [el.querySelector('input[type=color]'), el.querySelector('.name'), el.querySelector('select'), el.querySelector('input[type=number]')];
+    sel.value = String(r.merge);
+    const own = r.merge === -1;
+    colorIn.disabled = !own; hIn.disabled = !own || uniform();
+    if (uniform()) hIn.title = 'Turn off "Same height for every color" to change this';
+    if (!own) { const e = effectiveRegion(r); colorIn.value = e.flat ? $('baseColor').value : e.filament; }
+    colorIn.addEventListener('input', () => { r.filament = colorIn.value; r.spool = S.pickedSpool || null; refreshSwatches(); drawPreview(); scheduleBuild(); });
+    colorIn.addEventListener('change', () => renderRegions());
+    nameIn.addEventListener('change', () => { r.name = nameIn.value.trim() || colorName(r.source); renderRegions(); renderRimOptions(); recordState(); });
+    sel.addEventListener('change', () => { r.merge = +sel.value; renderRegions(); renderRimOptions(); drawPreview(); scheduleBuild(); });
+    hIn.addEventListener('change', () => { r.height = Math.max(0.2, Math.min(20, +hIn.value || 1)); hIn.value = r.height; scheduleBuild(); });
+    const sp = r.merge === -1 ? r.spool : (effectiveRegion(r).flat ? S.baseSpool : effectiveRegion(r).spool);
+    if (sp) { const d = document.createElement('div'); d.className = 'spool'; d.textContent = spoolLabel(sp); d.title = spoolLabel(sp); el.appendChild(d); }
+    el.title = 'Click to highlight on the model';
+    if (S.focus === i) el.classList.add('focused');
+    el.addEventListener('click', ev => { if (ev.target.closest('input, select, label')) return; setFocus(S.focus === i ? null : i); });
+    box.appendChild(el);
+  });
+  renderTally();
+  if (typeof refreshFocusChip === 'function' && S.focus != null) refreshFocusChip();
+}
+function refreshSwatches() {
+  document.querySelectorAll('.region').forEach(el => {
+    const r = S.regions[+el.dataset.i]; if (!r || r.merge === -1) return;
+    const e = effectiveRegion(r); el.querySelector('input[type=color]').value = e.flat ? $('baseColor').value : e.filament;
+  });
+  renderTally();
+}
+function effectiveFill(r) { const e = effectiveRegion(r); return e.flat ? $('baseColor').value : e.filament; }
+function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function usedFilaments() {
+  const set = new Set([$('baseColor').value.toLowerCase()]);
+  S.regions.forEach(r => { if (!(r.pixels > 0)) return; const e = effectiveRegion(r); if (!e.flat) set.add(e.filament.toLowerCase()); });
+  const rv = rimSelect().value;
+  if (rv === 'c' && S.rimCustom[S.gen]) set.add(S.rimCustom[S.gen].color.toLowerCase());
+  if (S.gen === 'coaster') set.add(rimFill('coasterRim').toLowerCase());
+  if (fillOn()) set.add(rimFill('filler').toLowerCase());
+  if (hasText()) set.add(textFill().toLowerCase());
+  return [...set];
+}
+function renderTally() {
+  renderSlots();
+  const f = usedFilaments(), t = $('tally');
+  t.className = 'tally' + (f.length > 4 ? ' warn' : '');
+  t.innerHTML = `<span class="dots">${f.map(c => `<i style="background:${c}" title="${escapeHtml(spoolForHex(c))}"></i>`).join('')}</span><span>${f.length} filament${f.length === 1 ? '' : 's'}${f.length > 4 ? '. That is more than a 4-tool printer holds, so merge regions or plan swaps.' : ''}</span>`;
+}
+$('baseColor').addEventListener('input', () => { S.baseSpool = S.pickedSpool || null; $('baseSpool').textContent = S.baseSpool ? '· ' + spoolLabel(S.baseSpool) : ''; refreshSwatches(); drawPreview(); scheduleBuild(); });
+
+// ---------- rim / border wall filament (may be a filament no art region uses) ----------
+const freshRimCustom = () => ({ tray: null, coin: null, keychain: null, magnet: null, coaster: null, bookmark: null, cookie: null, flat: null, coasterRim: null, filler: null });
+S.rimCustom = freshRimCustom();
+// one filament slot per rim-like part; keychain, magnet and coaster share the surround/face selector
+const RIM_SEL = { tray: 'rimStyle', coin: 'cRimFil', keychain: 'kRimFil', magnet: 'kRimFil', coaster: 'kRimFil', bookmark: 'kRimFil', cookie: 'kRimFil', flat: 'kRimFil', coasterRim: 'qRimFil', filler: 'fFil' };
+function rimCustomLabel(g) { const c = S.rimCustom[g]; return c.spool ? spoolLabel(c.spool) : 'Custom ' + colorName(c.color).toLowerCase(); }
+const rimSelect = () => $(RIM_SEL[S.gen]);
+function rimFill(g) {
+  const v = $(RIM_SEL[g]).value;
+  if (v === 'c' && S.rimCustom[g]) return S.rimCustom[g].color;
+  const o = S.regions[+v]; return o ? effectiveFill(o) : $('baseColor').value;
+}
+function rimSpool(g) {
+  const v = $(RIM_SEL[g]).value;
+  if (v === 'c' && S.rimCustom[g]) return S.rimCustom[g].spool;
+  const o = S.regions[+v]; if (o) { const e = effectiveRegion(o); return e.flat ? S.baseSpool : e.spool; }
+  return S.baseSpool;
+}
+// give the rim this filament: reuse a color already in the model if it matches, otherwise a custom one
+function applyRimColor(hex, spool, slot = S.gen) {
+  hex = hex.toLowerCase();
+  const same = (c, sp) => spool && sp ? spoolKey(spool) === spoolKey(sp) : rgbDist(hex, c) < 30;
+  let v = null;
+  if (slot !== 'tray' && same($('baseColor').value, S.baseSpool)) v = '-1';
+  else S.regions.forEach((o, j) => { if (v == null && o.merge === -1 && o.pixels > 0 && same(o.filament, o.spool)) v = String(j); });
+  if (v == null) { S.rimCustom[slot] = { color: hex, spool: spool || null }; v = 'c'; }
+  renderRimOptions(); $(RIM_SEL[slot]).value = v; syncRimField(); renderTally(); scheduleBuild();
+}
+// hidden color input so the rim can use the same filament picker as everything else
+const rimPick = document.createElement('input');
+rimPick.type = 'color'; rimPick.hidden = true; rimPick.id = 'rimPick'; document.body.appendChild(rimPick);
+rimPick.addEventListener('input', () => applyRimColor(rimPick.value, S.pickedSpool || null, S.rimPickSlot || S.gen));
+
+// ---------- 5. tray ----------
+function renderRimOptions() {
+  const sel = $('rimStyle'), prev = sel.value;
+  const owners = S.regions.map((r, i) => [r, i]).filter(([r]) => r.merge === -1 && r.pixels > 0);
+  const cust = g => S.rimCustom[g] ? `<option value="c">${escapeHtml(rimCustomLabel(g))}</option>` : '';
+  sel.innerHTML = owners.map(([r, i]) => `<option value="${i}">${escapeHtml(r.name)}</option>`).join('') + cust('tray') + '<option value="-1">None, flat base</option>';
+  if ([...sel.options].some(o => o.value === prev)) sel.value = prev; else sel.value = owners.length ? String(owners[0][1]) : '-1';
+  syncRimField();
+  const ts = $('tFil'), tprev = ts.value;
+  ts.innerHTML = '<option value="-1">Own filament</option>' + owners.map(([r, i]) => `<option value="${i}">Same as ${escapeHtml(r.name)}</option>`).join('');
+  ts.value = [...ts.options].some(o => o.value === tprev) ? tprev : '-1';
+  syncTextFil();
+  for (const g of ['coin', FLAT.has(S.gen) ? S.gen : 'keychain', 'coasterRim', 'filler']) {
+    const cs = $(RIM_SEL[g]), cprev = cs.value;
+    cs.innerHTML = '<option value="-1">Same as base</option>' + owners.map(([r, i]) => `<option value="${i}">${escapeHtml(r.name)}</option>`).join('') + cust(g);
+    if ([...cs.options].some(o => o.value === cprev)) cs.value = cprev;
+    else if (g === 'filler') { // default: the art color that stands out most from the base
+      let bi = -1, bd = -1; const base = $('baseColor').value;
+      owners.forEach(([r, i]) => { const dd = rgbDist(effectiveFill(r), base); if (dd > bd) { bd = dd; bi = i; } });
+      cs.value = bi >= 0 ? String(bi) : '-1';
+    } else cs.value = '-1';
+  }
+}
+$('rimStyle').addEventListener('change', () => { syncRimField(); scheduleBuild(); });
+function syncRimField() { $('rimHField').hidden = $('rimStyle').value === '-1'; }
+$('rimH').addEventListener('input', scheduleBuild);
+$('smooth').addEventListener('input', scheduleBuild);
+const uniform = () => $('uniformH').checked;
+const heightOf = r => uniform() ? +$('imgH').value : r.height;
+// art heights only matter when the art stands up (tray, raised coin); keychains and inlaid/engraved coins are flush
+function raisedArt() { return S.gen === 'tray' || (S.gen === 'coin' && coinMode() === 'raise'); }
+function syncUniform() { $('imgHField').hidden = !uniform(); renderRegions(); fillPop(); scheduleBuild(); }
+$('uniformH').addEventListener('change', syncUniform);
+$('imgH').addEventListener('input', () => { if (uniform()) { document.querySelectorAll('.region input[type=number]').forEach(h => h.value = $('imgH').value); fillPop(); } scheduleBuild(); });
+const trayInputs = [['hmm', v => v + ' mm'], ['base', v => (+v).toFixed(1) + ' mm'], ['rim', v => (+v).toFixed(1) + ' mm'], ['round', v => (+v).toFixed(1) + ' mm']];
+trayInputs.forEach(([id]) => $(id).addEventListener('input', scheduleBuild));
+
+// ---------- size: height, width and scale stay linked ----------
+const SCALE_REF_MM = 156;
+function widthForHeight(H) {
+  const p = S.prep, r = +$('rim').value; if (!p) return null;
+  return (H - 2 * r) / p.height * p.width + 2 * r;
+}
+function heightForWidth(W) {
+  const p = S.prep, r = +$('rim').value; if (!p) return null;
+  return (W - 2 * r) / p.width * p.height + 2 * r;
+}
+function syncSize(actualW) {
+  const H = +$('hmm').value, w = actualW != null ? actualW : widthForHeight(H);
+  if (document.activeElement !== $('wmm') && w != null) $('wmm').value = w.toFixed(1);
+  if (document.activeElement !== $('scalePct')) $('scalePct').value = Math.round(H / SCALE_REF_MM * 100);
+}
+function setHeight(H) {
+  if (!isFinite(H)) { syncSize(); return; }
+  const r = $('hmm'); r.value = Math.min(+r.max, Math.max(+r.min, H));
+  r.dispatchEvent(new Event('input'));
+}
+$('hmm').addEventListener('input', () => syncSize());
+$('rim').addEventListener('input', () => syncSize());
+$('wmm').addEventListener('change', () => { const H = heightForWidth(parseFloat($('wmm').value)); setHeight(H); $('wmm').blur(); syncSize(); });
+$('scalePct').addEventListener('change', () => { setHeight(SCALE_REF_MM * parseFloat($('scalePct').value) / 100); $('scalePct').blur(); syncSize(); });
+['wmm', 'scalePct'].forEach(id => $(id).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $(id).dispatchEvent(new Event('change')); } }));
+
+// number boxes beside each slider: typing sets the slider (clamped to its range), dragging updates the box
+document.querySelectorAll('.field input[type=range]').forEach(r => {
+  const n = $(r.id + 'Num'); if (!n) return;
+  const dec = (String(r.step).split('.')[1] || '').length;
+  const show = v => { n.value = (+v).toFixed(dec); };
+  const commit = () => {
+    let v = parseFloat(n.value);
+    if (!isFinite(v)) { show(r.value); return; }
+    v = Math.min(+r.max, Math.max(+r.min, v));
+    if (Math.abs(v - +r.value) < 1e-9) { show(r.value); return; } // no real change (e.g. blur after undo set the box)
+    r.value = v; show(r.value);
+    r.dispatchEvent(new Event('input'));
+  };
+  n.addEventListener('change', commit);
+  n.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); commit(); } });
+  r.addEventListener('input', () => { if (document.activeElement !== n) show(r.value); });
+  show(r.value);
+});
+// mm per art pixel for the active generator (used to size the speck filter)
+function artMmPerPx() {
+  const p = S.prep; if (!p) return 0.2;
+  if (S.gen === 'coin') {
+    const artR = Math.max(0.5, (+$('cDia').value / 2 - Math.min(+$('cRimW').value, +$('cDia').value / 2 - 1) - 1) * +$('cScale').value / 100);
+    if (!p._rad) p._rad = C.artRadiusPx(p);
+    return artR / p._rad;
+  }
+  if (S.gen === 'cookie') return +$('ckSize').value / Math.max(p.width, p.height);
+  if (S.gen === 'bookmark') { const m = 2 * +$('kMargin').value; return Math.max(0.01, Math.min((+$('bWid').value - m) / p.width, (+$('bLen').value - m) / p.height)) * +$('kScale').value / 100; }
+  if (FLAT.has(S.gen)) return Math.max(1, +$('kSize').value - 2 * (+$('kMargin').value + (S.gen === 'coaster' ? +$('qRimW').value : 0))) / Math.max(p.width, p.height) * (kcShape() === 'outline' ? 1 : 0.8 * +$('kScale').value / 100);
+  return subjectHeightMM() / p.height;
+}
+function subjectHeightMM() { return Math.max(5, +$('hmm').value - 2 * +$('rim').value); }
+
+function scheduleBuild() {
+  if (!S.prep || !S.prep.labels) return;
+  clearTimeout(S.buildTimer);
+  S.buildTimer = setTimeout(build, 280);
+}
+const triangulate = (outer, holes) => THREE.ShapeUtils.triangulateShape(
+  outer.map(p => new THREE.Vector2(p[0], p[1])), holes.map(h => h.map(p => new THREE.Vector2(p[0], p[1]))));
+
+function mirroredPrep() {
+  const p = S.prep; if (!S.mirror) return p;
+  const w = p.width, h = p.height, mask = new Uint8Array(w * h), labels = new Int16Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const s = y * w + x, d = y * w + (w - 1 - x); mask[d] = p.mask[s]; labels[d] = p.labels[s]; }
+  return { width: w, height: h, mask, labels };
+}
+
+async function build() {
+  if (!window.THREE) { status('3D library failed to load. Check your connection and reload.'); return; }
+  const token = ++S.buildToken;
+  status('Building ' + GEN[S.gen].title.toLowerCase() + '…');
+  await later(() => {});
+  if (token !== S.buildToken) return;
+  try {
+    const layerOf = S.regions.map((r, i) => { const t = resolve(i); return t === -2 ? -1 : t; });
+    const layers = S.regions.map((r, i) => ({ id: i, height: heightOf(r) })).filter((L, i) => S.regions[i].merge === -1);
+    const cmp = composite(), bprep = cmp ? cmp.prep : mirroredPrep();
+    if (cmp) { // text label sits right after the colour regions
+      const tv = $('tFil').value;
+      if (tv === '-1') { layerOf.push(TEXT_ID); layers.push({ id: TEXT_ID, height: textHeight() }); }
+      else { const j = resolve(+tv); layerOf.push(j === -2 ? -1 : j); }
+    }
+    if (S.gen === 'cookie') {
+      if (cmp) layerOf[layerOf.length - 1] = TEXT_ID; // text always stands up on the stamp
+      const lines = [...new Set(stampOwners().filter(([r, i]) => isStamped(r, i)).map(([, i]) => i))];
+      if (cmp) lines.push(TEXT_ID);
+      const res = C.buildCookie(bprep, {
+        sizeMM: +$('ckSize').value, heightMM: +$('ckH').value, wallMM: +$('ckWall').value, bladeMM: +$('ckBlade').value,
+        lipWidthMM: +$('ckLip').value, lipHeightMM: +$('ckLipH').value, fillGapsMM: +$('ckGaps').value, smoothMM: +$('smooth').value,
+        layerOf, lineLayers: lines,
+        stamp: $('ckStamp').checked ? { plateId: STAMP_ID, clearanceMM: +$('ckClr').value, thicknessMM: +$('ckST').value, reliefMM: +$('ckRel').value, boostMM: +$('ckBoost').value } : null,
+      }, triangulate);
+      if (token !== S.buildToken) return;
+      S.tray = res; showTray(res); textSizeReadout(res.mmPerPx);
+      $('dims').textContent = `Cookie ${res.cookieSize[0].toFixed(1)} × ${res.cookieSize[1].toFixed(1)} mm · cutter ${res.cutSize[0].toFixed(1)} × ${res.cutSize[1].toFixed(1)} × ${(+$('ckH').value).toFixed(1)} mm`;
+      ['dl3mf', 'dlOrca', 'dlZip', 'dlStl', 'sendOrca'].forEach(id => $(id).disabled = false);
+      renderSlots();
+      status(res.stamp && !res.stamp.lines ? 'No lines on the stamp yet. Tick a color under Stamp.' : ''); recordState(); return;
+    }
+    if (FLAT.has(S.gen)) {
+      const g = S.gen, sep = $('kRimFil').value !== '-1', clr = +$('mClr').value;
+      const fill = fillOn() ? { shape: $('fShape').value, count: +$('fCount').value, minMM: +$('fMin').value, maxMM: +$('fMax').value, gapMM: +$('fGap').value, edgeMM: Math.max(1, +$('kMargin').value * 0.6), seed: +$('fSeed').value, layerId: FILL_ID } : null;
+      if (fill) layers.push({ id: FILL_ID, height: 1 });
+      const res = C.buildKeychain(bprep, {
+        shape: kcShape(), sizeMM: g === 'bookmark' ? Math.max(+$('bLen').value, +$('bWid').value) : +$('kSize').value,
+        rectWMM: +$('bWid').value, rectHMM: +$('bLen').value, cornerMM: +$('bCorner').value,
+        tassel: g === 'bookmark' && $('bTassel').checked ? { diaMM: +$('bHole').value, fromEdgeMM: +$('bHoleY').value } : null,
+        thicknessMM: +$('kThick').value, colorDepthMM: +$('kDepth').value,
+        marginMM: +$('kMargin').value, fillGapsMM: +$('kGaps').value, artScale: +$('kScale').value / 100, offsetXMM: +$('kOffX').value, offsetYMM: +$('kOffY').value,
+        holePos: g === 'keychain' ? $('kHolePos').value : 'none', holeDiaMM: +$('kHole').value, ringWallMM: +$('kRing').value, smoothMM: +$('smooth').value,
+        pockets: g === 'magnet' ? { count: +$('mCount').value, diaMM: +$('mDia').value + 2 * clr, depthMM: +$('mThick').value + clr, hidden: $('mStyle').value === 'hidden', floorMM: 0.6 } : null,
+        rimWidthMM: g === 'coaster' ? +$('qRimW').value : 0, rimHeightMM: +$('qRimH').value, rimLayer: QRIM_ID,
+        recess: g === 'coaster' && $('qPad').checked ? { depthMM: +$('qPadD').value, insetMM: +$('qPadIn').value } : null,
+        minLineMM: +$('kMinLine').value, darkToLight: darkToLight(),
+        fill, layerOf, layers, marginLayer: sep ? KRIM_ID : -1 }, triangulate);
+      if (token !== S.buildToken) return;
+      S.tray = res; showTray(res); textSizeReadout(res.mmPerPx);
+      $('dims').textContent = `${res.size[0].toFixed(1)} × ${res.size[1].toFixed(1)} × ${res.height.toFixed(1)} mm`;
+      ['dl3mf', 'dlOrca', 'dlZip', 'dlStl', 'sendOrca'].forEach(id => $(id).disabled = false);
+      S.lastPauseZ = res.pauseZ; magnetHint();
+      if (fill) $('fHint').textContent = res.fillers ? `${res.fillers} shape${res.fillers === 1 ? '' : 's'} placed${res.fillers < fill.count ? ' (that is all that fits; try smaller sizes or less space between)' : ''}. Click one in the 3D view to change its filament.` : 'No room for shapes. Lower the sizes, the space between, or the space around the art.';
+      const warn = (res.warnings || []).slice();
+      if (g === 'keychain' && !res.hole && $('kHolePos').value !== 'none') warn.push('No room found for the key ring. Try another ring position.');
+      status(warn.join(' ')); recordState(); return;
+    }
+    if (S.gen === 'coin') {
+      const crv = $('cRimFil').value, cr = crv === 'c' ? 0 : +crv, mode = coinMode();
+      const res = C.buildCoin(bprep, {
+        diameterMM: +$('cDia').value, thicknessMM: +$('cThick').value, rimWidthMM: +$('cRimW').value, rimHeightMM: +$('cRimH').value,
+        marginMM: 1, mode, depthMM: +$('cDepth').value, artScale: +$('cScale').value / 100, offsetXMM: +$('cOffX').value, offsetYMM: +$('cOffY').value,
+        smoothMM: +$('smooth').value, layerOf, layers, rimLayer: CRIM_ID }, triangulate); // rim is its own part so it can be clicked and painted
+      if (token !== S.buildToken) return;
+      S.tray = res; showTray(res); textSizeReadout(res.mmPerPx);
+      $('dims').textContent = `Ø ${res.size[0].toFixed(1)} × ${res.height.toFixed(1)} mm`;
+      ['dl3mf', 'dlOrca', 'dlZip', 'dlStl', 'sendOrca'].forEach(id => $(id).disabled = false);
+      status(''); recordState(); return;
+    }
+    const rv = $('rimStyle').value, rimCustom = rv === 'c' && S.rimCustom.tray, rimSel = rimCustom ? 0 : +rv;
+    // the border wall is its own part so its height is independent of the art
+    if (rimSel >= 0) layers.push({ id: RIM_ID, height: +$('rimH').value });
+    // a custom wall filament has no art region to fill enclosed gaps, so they get their own part in that filament
+    if (rimCustom) layers.push({ id: GAP_ID, height: +$('imgH').value });
+    const opts = { heightMM: subjectHeightMM(), rimMM: +$('rim').value, roundMM: +$('round').value, smoothMM: +$('smooth').value, baseMM: +$('base').value, layerOf, layers, rimLayer: rimSel >= 0 ? RIM_ID : -1, gapLayer: rimCustom ? GAP_ID : rimSel >= 0 ? resolve(rimSel) : -1 };
+    const res = C.buildTray(bprep, opts, triangulate);
+    if (token !== S.buildToken) return;
+    S.tray = res;
+    showTray(res); textSizeReadout(res.mmPerPx);
+    $('dims').textContent = `${res.size[0].toFixed(1)} × ${res.size[1].toFixed(1)} mm`;
+    syncSize(res.size[0]);
+    ['dl3mf', 'dlOrca', 'dlZip', 'dlStl', 'sendOrca'].forEach(id => $(id).disabled = false);
+    status(''); recordState();
+  } catch (e) {
+    console.error(e); status('Build failed: ' + e.message);
+  }
+}
+
+const RIM_ID = 32000, CRIM_ID = 32001, GAP_ID = 32002, KRIM_ID = 32003, TEXT_ID = 32004, QRIM_ID = 32006, FILL_ID = 32007, STAMP_ID = 32008;
+function partList() {
+  if (!S.tray) return [];
+  const sp = s => s ? ' - ' + spoolLabel(s) : '';
+  return S.tray.parts.map(p => {
+    const g = { id: p.id, mesh: p.mesh, shapes: p.shapes, top: p.top };
+    if (p.id === 'base') return { ...g, name: (S.gen === 'cookie' ? 'Cutter' : 'Base') + sp(S.baseSpool), color: $('baseColor').value };
+    if (p.id === STAMP_ID) return { ...g, name: 'Stamp' + sp(S.baseSpool), color: $('baseColor').value };
+    if (p.id === CRIM_ID) return { ...g, name: 'Rim' + sp(rimSpool('coin')), color: rimFill('coin') };
+    if (p.id === RIM_ID) return { ...g, name: 'Border wall' + sp(rimSpool('tray')), color: rimFill('tray') };
+    if (p.id === TEXT_ID) return { ...g, name: 'Text' + sp(textSpool()), color: textFill() };
+    if (p.id === KRIM_ID) return { ...g, name: (S.gen === 'coaster' ? 'Face' : 'Surround') + sp(rimSpool(S.gen)), color: rimFill(S.gen) };
+    if (p.id === QRIM_ID) return { ...g, name: 'Rim' + sp(rimSpool('coasterRim')), color: rimFill('coasterRim') };
+    if (p.id === FILL_ID) return { ...g, name: 'Filler shapes' + sp(rimSpool('filler')), color: rimFill('filler') };
+    if (p.id === GAP_ID) return { ...g, name: 'Gap fill' + sp(rimSpool('tray')), color: rimFill('tray') };
+    const r = S.regions[p.id];
+    // right after the colors are re-detected the old model can name regions that no longer exist
+    if (!r) return null;
+    return { ...g, name: r.name + sp(r.spool), color: r.filament };
+  }).filter(Boolean);
+}
+
+// ---------- generator switch ----------
+S.gen = 'tray';
+const GEN = {
+  tray: { title: 'Tray', suffix: '_tray', imgH: 3, smooth: 0.35 },
+  coin: { title: 'Coin', suffix: '_coin', imgH: 1, smooth: 0.12 },
+  keychain: { title: 'Keychain', suffix: '_keychain', imgH: 1, smooth: 0.15,
+    flat: { kSize: 50, kThick: 3.5, kDepth: 1, kMargin: 2.5, kGaps: 4, kScale: 100, kOffX: 0, kOffY: 0, shape: 'outline', kRimFil: '-1' } },
+  magnet: { title: 'Magnet', suffix: '_magnet', imgH: 1, smooth: 0.15,
+    flat: { kSize: 60, kThick: 5, kDepth: 1, kMargin: 2, kGaps: 4, kScale: 100, kOffX: 0, kOffY: 0, shape: 'outline', kRimFil: '-1' } },
+  coaster: { title: 'Coaster', suffix: '_coaster', imgH: 1, smooth: 0.2,
+    flat: { kSize: 100, kThick: 4, kDepth: 0.8, kMargin: 3, kGaps: 4, kScale: 100, kOffX: 0, kOffY: 0, shape: 'circle', kRimFil: '-1' } },
+  flat: { title: 'Flat model', suffix: '_flat', imgH: 1, smooth: 0.15,
+    flat: { kSize: 80, kThick: 3.5, kDepth: 1.5, kMargin: 0, kGaps: 1, kScale: 100, kOffX: 0, kOffY: 0, shape: 'outline', kRimFil: '-1', faceDown: true } },
+  cookie: { title: 'Cookie cutter', suffix: '_cookie_cutter', imgH: 1, smooth: 0.2 },
+  bookmark: { title: 'Bookmark', suffix: '_bookmark', imgH: 1, smooth: 0.15,
+    flat: { kSize: 150, kThick: 1.6, kDepth: 1, kMargin: 3, kGaps: 4, kScale: 100, kOffX: 0, kOffY: 0, shape: 'rect', kRimFil: '-1', faceDown: true } },
+};
+const GEN_NAME = { tray: 'Trinket tray', coin: 'Coin & token', keychain: 'Keychain', magnet: 'Magnet', coaster: 'Coaster', bookmark: 'Bookmark', cookie: 'Cookie cutter', flat: 'Flat model' };
+const GEN_BTN = { tray: 'genTray', coin: 'genCoin', keychain: 'genKey', magnet: 'genMag', coaster: 'genCoast', bookmark: 'genBook', cookie: 'genCookie', flat: 'genFlat' };
+const FLAT = new Set(['keychain', 'magnet', 'coaster', 'bookmark', 'flat']); // share the flat-model panel
+const FLAT_IDS = ['kSize', 'kThick', 'kDepth', 'kMargin', 'kGaps', 'kScale', 'kOffX', 'kOffY'];
+function saveFlat(g) { const v = GEN[g].flat; FLAT_IDS.forEach(id => v[id] = +$(id).value); if (g !== 'bookmark') v.shape = kcShape(); v.kRimFil = $('kRimFil').value; v.faceDown = $('kFaceDown').checked; }
+function loadFlat(g) {
+  const v = GEN[g].flat;
+  FLAT_IDS.forEach(id => { $(id).value = v[id]; $(id).dispatchEvent(new Event('input')); });
+  const r = document.querySelector(`input[name=kShape][value="${v.shape}"]`); if (r) r.checked = true;
+  $('kFaceDown').checked = !!v.faceDown;
+  S.pendingRimFil = v.kRimFil;
+}
+function kcShape() { if (S.gen === 'bookmark') return 'rect'; return (document.querySelector('input[name=kShape]:checked') || {}).value || 'outline'; }
+function syncKcShape() {
+  const s = kcShape(), g = S.gen;
+  $('kGapsField').hidden = s !== 'outline'; $('kPlace').hidden = s === 'outline';
+  $('kShapeHint').textContent = s === 'outline' ? 'Follows the outline of the art with a small border. Narrow gaps and dents get filled in.'
+    : `A ${s} sized to the longest side, with the art fitted as large as it goes.`;
+  $('kHoleFields').hidden = $('kHolePos').value === 'none';
+  $('kRingSec').hidden = g !== 'keychain'; $('kMagSec').hidden = g !== 'magnet'; $('kCoastSec').hidden = g !== 'coaster';
+  $('kFaceDownRow').hidden = g === 'coaster'; // the coaster rim stands above the face
+  const bm = g === 'bookmark'; $('kBookSec').hidden = !bm; $('kShapeSec').hidden = bm; $('kSizeField').hidden = bm;
+  $('bTasselFields').hidden = !$('bTassel').checked;
+  $('kRimFilLbl').textContent = g === 'coaster' ? 'Face filament' : 'Surround filament';
+  $('qPadFields').hidden = !$('qPad').checked;
+}
+function coinMode() { return (document.querySelector('input[name=cMode]:checked') || {}).value || 'raise'; }
+function syncCoinMode() {
+  const m = coinMode();
+  $('cDepthField').hidden = m === 'raise';
+  $('cModeHint').textContent = m === 'raise' ? 'Art stands above the face. Its height is set in step 4.'
+    : m === 'engrave' ? 'Art is cut into the face as pockets, one filament. Colors set to "Leave flat" stay part of the face.'
+    : 'Art is cut into the face and filled flush with each color. Prints the face flat with no raised detail.';
+  const raise = raisedArt(); // keychains are always flush
+  $('popHRow').hidden = !raise;
+  if (typeof syncTextUI === 'function') syncTextUI();
+  if (S.prep && S.prep.labels) renderRegions();
+  $('uniformH').closest('.toggle').hidden = !raise;
+  $('imgHField').hidden = !raise || !$('uniformH').checked;
+}
+function setGen(g) {
+  if (g === S.gen) return;
+  GEN[S.gen].imgH = +$('imgH').value; GEN[S.gen].smooth = +$('smooth').value;
+  if (FLAT.has(S.gen)) saveFlat(S.gen);
+  S.gen = g;
+  for (const k in GEN_BTN) $(GEN_BTN[k]).setAttribute('aria-selected', k === g);
+  document.body.classList.toggle('gen-cookie', g === 'cookie');
+  $('trayOpts').hidden = g !== 'tray'; $('coinOpts').hidden = g !== 'coin'; $('kcOpts').hidden = !FLAT.has(g); $('cookieOpts').hidden = g !== 'cookie';
+  if (FLAT.has(g)) loadFlat(g);
+  $('s5Title').textContent = GEN[g].title;
+  $('imgH').value = GEN[g].imgH; $('imgH').dispatchEvent(new Event('input'));
+  $('smooth').value = GEN[g].smooth; $('smooth').dispatchEvent(new Event('input'));
+  const fn = $('fileName').value;
+  for (const k in GEN) if (fn.endsWith(GEN[k].suffix)) $('fileName').value = fn.slice(0, -GEN[k].suffix.length) + GEN[g].suffix;
+  document.title = '3D Maker Generators · ' + GEN_NAME[g];
+  if (gl) gl.framed = false;
+  syncCoinMode(); closePop();
+  if (S.prep && S.prep.labels) renderRimOptions();
+  if (S.pendingRimFil != null) { const s = $('kRimFil'); if ([...s.options].some(o => o.value === S.pendingRimFil)) s.value = S.pendingRimFil; S.pendingRimFil = null; }
+  syncKcShape(); renderTally();
+  if (S.prep && S.prep.labels) { renderRegions(); scheduleBuild(); }
+}
+$('genTray').addEventListener('click', () => setGen('tray'));
+$('genCoin').addEventListener('click', () => setGen('coin'));
+$('genKey').addEventListener('click', () => setGen('keychain'));
+$('genMag').addEventListener('click', () => setGen('magnet'));
+$('genCoast').addEventListener('click', () => setGen('coaster'));
+$('genBook').addEventListener('click', () => setGen('bookmark'));
+$('genCookie').addEventListener('click', () => setGen('cookie'));
+$('genFlat').addEventListener('click', () => setGen('flat'));
+$('kFaceDown').addEventListener('change', () => { if (S.tray) { status(''); recordState(); magnetHint(); } });
+['ckSize', 'ckH', 'ckWall', 'ckBlade', 'ckLip', 'ckLipH', 'ckGaps', 'ckBoost', 'ckRel', 'ckST', 'ckClr'].forEach(id => $(id).addEventListener('input', scheduleBuild));
+$('ckStamp').addEventListener('change', () => { $('ckStampFields').hidden = !$('ckStamp').checked; scheduleBuild(); });
+// stamp lines: which colours stand up on the stamp (default: the darkest, usually the outline)
+function stampOwners() { return S.regions.map((r, i) => [r, i]).filter(([r]) => r.merge === -1 && r.pixels > 0); }
+function isStamped(r, i) { if (r.stamp != null) return r.stamp; const o = stampOwners(); return o.length > 0 && o[0][1] === i; }
+function renderCookieLines() {
+  const box = $('ckLines'); if (!box) return;
+  box.innerHTML = stampOwners().map(([r, i]) => `<label><input type="checkbox" data-i="${i}"${isStamped(r, i) ? ' checked' : ''}><span class="sw" style="background:${escapeHtml(effectiveFill(r))}"></span>${escapeHtml(r.name)}</label>`).join('')
+    + (hasText() ? '<p class="hint" style="margin:0">Text is always raised on the stamp.</p>' : '');
+}
+$('ckLines').addEventListener('change', e => {
+  const cb = e.target.closest('input[data-i]'); if (!cb) return;
+  stampOwners().forEach(([r, i]) => { r.stamp = isStamped(r, i); }); // fix the defaults before changing one
+  S.regions[+cb.dataset.i].stamp = cb.checked; scheduleBuild();
+});
+function fillOn() { return FLAT.has(S.gen) && $('fOn').checked; }
+['fCount', 'fMin', 'fMax', 'fGap', 'kMinLine'].forEach(id => $(id).addEventListener('input', scheduleBuild));
+['fShape', 'fFil'].forEach(id => $(id).addEventListener('change', () => { renderTally(); scheduleBuild(); }));
+$('fOn').addEventListener('change', () => { $('fFields').hidden = !$('fOn').checked; renderTally(); scheduleBuild(); });
+$('fShuffle').addEventListener('click', () => { $('fSeed').value = String(1 + Math.floor(Math.random() * 1e9)); scheduleBuild(); });
+['bLen', 'bWid', 'bCorner', 'bHole', 'bHoleY'].forEach(id => $(id).addEventListener('input', scheduleBuild));
+$('bTassel').addEventListener('change', () => { syncKcShape(); scheduleBuild(); });
+['mDia', 'mThick', 'mClr', 'qRimW', 'qRimH', 'qPadD', 'qPadIn'].forEach(id => $(id).addEventListener('input', scheduleBuild));
+['mCount', 'mStyle', 'qRimFil', 'qPad'].forEach(id => $(id).addEventListener('change', () => { syncKcShape(); renderTally(); scheduleBuild(); }));
+document.querySelectorAll('input[name=kShape]').forEach(r => r.addEventListener('change', () => { syncKcShape(); scheduleBuild(); }));
+['kSize', 'kThick', 'kDepth', 'kMargin', 'kGaps', 'kScale', 'kOffX', 'kOffY', 'kHole', 'kRing'].forEach(id => $(id).addEventListener('input', scheduleBuild));
+['kRimFil', 'kHolePos'].forEach(id => $(id).addEventListener('change', () => { syncKcShape(); scheduleBuild(); }));
+document.querySelectorAll('input[name=cMode]').forEach(r => r.addEventListener('change', () => { syncCoinMode(); scheduleBuild(); }));
+['cDia', 'cThick', 'cRimW', 'cRimH', 'cDepth', 'cScale', 'cOffX', 'cOffY'].forEach(id => $(id).addEventListener('input', scheduleBuild));
+$('cRimFil').addEventListener('change', scheduleBuild);
+$('uniformH').addEventListener('change', syncCoinMode);
+
+// ---------- undo / redo ----------
+// A snapshot of everything the user can change: per-pixel color labels, color cards, base filament,
+// every setting in the panel, orientation and generator. Taken after each rebuild settles, so a
+// slider drag or a run of quick edits lands as one step.
+const H = { undo: [], redo: [], cur: null, restoring: false, LIMIT: 40, seq: 0 };
+const CONTROL_SKIP = new Set(['file', 'fileName', 'spQ', 'spCustom', 'paintColor', 'popColor', 'popH', 'spClosest']);
+function controlState() {
+  const out = {};
+  document.querySelectorAll('.panel input[id], .panel select[id], .panel textarea[id]').forEach(el => {
+    if (CONTROL_SKIP.has(el.id) || el.id.endsWith('Num') || el.type === 'file' || el.type === 'color' || el.closest('.region')) return;
+    out[el.id] = el.type === 'checkbox' || el.type === 'radio' ? el.checked : el.value;
+  });
+  return out;
+}
+function takeSnapshot() {
+  const p = S.prep; if (!p || !p.labels) return null;
+  const prev = H.cur;
+  // share the label buffer with the previous step when no pixel changed (saves memory on slider-only edits)
+  let labels = p.labels;
+  if (prev && prev.prep === p && prev.labels.length === labels.length) {
+    let same = true; for (let i = 0; i < labels.length; i++) if (prev.labels[i] !== labels[i]) { same = false; break; }
+    labels = same ? prev.labels : new Int16Array(labels);
+  } else labels = new Int16Array(labels);
+  const labelsId = prev && labels === prev.labels ? prev.labelsId : ++H.seq;
+  const snap = {
+    prep: p, labels, labelsId, gen: S.gen, mirror: S.mirror,
+    regions: S.regions.map(r => ({ ...r })), stats: S.stats,
+    baseColor: $('baseColor').value, baseSpool: S.baseSpool || null, controls: controlState(), rimCustom: { ...S.rimCustom }, textC: { ...S.textC },
+  };
+  snap.key = JSON.stringify([snap.gen, snap.mirror, snap.regions.map(r => [r.name, r.filament, r.height, r.merge, r.pixels, r.spool && spoolKey(r.spool), r.stamp]), snap.baseColor, snap.baseSpool && spoolKey(snap.baseSpool), snap.controls, Object.values(snap.rimCustom).map(c => c && [c.color, c.spool && spoolKey(c.spool)]), [snap.textC.color, snap.textC.spool && spoolKey(snap.textC.spool)]]) + '|' + labelsId;
+  return snap;
+}
+function recordState() {
+  if (H.restoring) return;
+  const s = takeSnapshot(); if (!s) return;
+  if (H.cur && H.cur.key === s.key) return;
+  if (H.cur) { H.undo.push(H.cur); if (H.undo.length > H.LIMIT) H.undo.shift(); H.redo = []; }
+  H.cur = s; syncHistButtons();
+}
+function clearHistory() { H.undo = []; H.redo = []; H.cur = null; syncHistButtons(); }
+function syncHistButtons() {
+  $('undoBtn').disabled = !H.undo.length; $('redoBtn').disabled = !H.redo.length;
+  $('undoBtn').title = H.undo.length ? `Undo (Ctrl+Z) · ${H.undo.length} step${H.undo.length === 1 ? '' : 's'}` : 'Nothing to undo';
+}
+function restoreSnapshot(s) {
+  H.restoring = true;
+  try {
+    closePop(); S.focus = null; $('focusChip').hidden = true;
+    if (s.gen !== S.gen) setGen(s.gen);
+    S.prep = s.prep; S.prep.labels = new Int16Array(s.labels);
+    S.regions = s.regions.map(r => ({ ...r })); S.stats = s.stats;
+    $('baseColor').value = s.baseColor; S.baseSpool = s.baseSpool; S.rimCustom = { ...s.rimCustom }; S.textC = { ...s.textC }; $('tColor').value = S.textC.color;
+    $('baseSpool').textContent = S.baseSpool ? '· ' + spoolLabel(S.baseSpool) : '';
+    S.mirror = s.mirror; $('mYes').checked = s.mirror; $('mNo').checked = !s.mirror;
+    // set values without firing handlers (those would re-run background or color detection)
+    const selects = [];
+    for (const [id, v] of Object.entries(s.controls)) {
+      const el = $(id); if (!el) continue;
+      if (el.type === 'checkbox' || el.type === 'radio') el.checked = v;
+      else if (el.tagName === 'SELECT') selects.push([el, v]);
+      else el.value = v;
+      const n = $(id + 'Num');
+      if (n && el.type === 'range') n.value = (+el.value).toFixed((String(el.step).split('.')[1] || '').length);
+    }
+    renderRegions(); renderRimOptions();
+    for (const [el, v] of selects) if ([...el.options].some(o => o.value === v)) el.value = v;
+    syncRimField(); $('imgHField').hidden = !$('uniformH').checked; $('fFields').hidden = !$('fOn').checked; $('ckStampFields').hidden = !$('ckStamp').checked; syncCoinMode(); syncKcShape(); syncTextUI(); syncTextFil();
+    if (typeof syncSize === 'function' && S.gen === 'tray') syncSize();
+    drawThumbs(); drawPreview(); renderPaintSwatches();
+    H.cur = s;
+  } finally { H.restoring = false; }
+  syncHistButtons();
+  clearTimeout(S.buildTimer); build();
+}
+function undo() { if (!H.undo.length || !H.cur) return; H.redo.push(H.cur); restoreSnapshot(H.undo.pop()); status('Undone'); setTimeout(() => { if ($('status').textContent === 'Undone') status(''); }, 1200); }
+function redo() { if (!H.redo.length || !H.cur) return; H.undo.push(H.cur); restoreSnapshot(H.redo.pop()); }
+$('undoBtn').addEventListener('click', undo);
+$('redoBtn').addEventListener('click', redo);
+document.addEventListener('keydown', e => {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+  const t = e.target, typing = t && (t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && /^(text|search|number)$/.test(t.type)));
+  if (typing || !$('spBack').hidden) return; // leave text-box undo alone
+  const k = e.key.toLowerCase();
+  if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+  else if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); redo(); }
+});
+
+// ---------- click to color ----------
+function selectAt(x, y, clientX, clientY) {
+  const p = S.prep; if (!p || !p.labels) return;
+  x = Math.round(x); y = Math.round(y);
+  if (x < 0 || y < 0 || x >= p.width || y >= p.height) { closePop(); return; }
+  if (S.mirror) x = p.width - 1 - x;
+  const i = y * p.width + x;
+  if (!p.mask[i] || p.labels[i] < 0) { closePop(); return; }
+  const pixels = C.componentAt(p.labels, p.width, p.height, i);
+  if (S.tool === 'paint') { paintPiece(pixels, p.labels[i]); return; }
+  S.sel = { pixels, label: p.labels[i] };
+  $('scopePiece').checked = true;
+  openPop(clientX, clientY);
+  renderRegions(); drawPreview();
+}
+function labelCount(l) { let n = 0; for (const v of S.prep.labels) if (v === l) n++; return n; }
+// region index the popover edits; splits the piece into its own region on first change
+function popTarget() {
+  const sel = S.sel, L = sel.label;
+  if (!$('scopePiece').checked || sel.pixels.length >= labelCount(L)) return L;
+  const src = S.regions[L], e = effectiveRegion(src);
+  const n = S.regions.filter(r => r.source === src.source).length;
+  const nr = { source: src.source, name: `${src.name} ${n + 1}`, filament: e.flat ? src.filament : e.filament, height: e.flat ? src.height : e.height,
+    merge: src.merge, pixels: sel.pixels.length, split: true };
+  const idx = S.regions.push(nr) - 1;
+  for (const i of sel.pixels) S.prep.labels[i] = idx;
+  src.pixels -= sel.pixels.length;
+  sel.label = idx;
+  return idx;
+}
+function afterEdit() { renderRegions(); renderRimOptions(); drawPreview(); scheduleBuild(); fillPop(); }
+function fillPop() {
+  if (!S.sel) return;
+  const L = S.sel.label, r = S.regions[L], e = effectiveRegion(r);
+  const total = S.regions.reduce((a, b) => a + b.pixels, 0) || 1;
+  const count = labelCount(L), whole = S.sel.pixels.length >= count;
+  $('popSrc').style.background = r.source;
+  $('popTitle').innerHTML = `${escapeHtml(r.name)} <small>${Math.max(0.1, S.sel.pixels.length / total * 100).toFixed(1)}% of art</small>`;
+  document.querySelector('.seg').hidden = whole;
+  if (whole) $('scopePiece').checked = true;
+  $('scopeAllLbl').textContent = `All ${r.name.toLowerCase()}`;
+  $('popColor').value = e.flat ? $('baseColor').value : e.filament;
+  $('popH').value = uniform() ? $('imgH').value : (e.flat ? r.height : e.height);
+  $('popH').disabled = !!e.flat || uniform();
+  $('popH').title = uniform() ? 'Turn off "Same height for every color" to change this' : '';
+  const owners = S.regions.map((o, j) => [o, j]).filter(([o]) => o.merge === -1 && o.pixels > 0);
+  const cur = resolve(L);
+  $('popSw').innerHTML = owners.map(([o, j]) => `<button type="button" data-j="${j}" style="background:${o.filament}" title="${escapeHtml(o.name)}" aria-label="Use ${escapeHtml(o.name)} filament" aria-pressed="${cur === j}"></button>`).join('')
+    + `<button type="button" class="flat" data-j="-2" title="Leave flat (base shows)" aria-label="Leave flat" aria-pressed="${cur === -2}"></button>`;
+}
+function openPop(cx, cy) {
+  const pop = $('pop'), st = document.querySelector('.stage').getBoundingClientRect();
+  pop.hidden = false; fillPop();
+  const w = pop.offsetWidth, h = pop.offsetHeight;
+  let left = cx - st.left + 16, top = cy - st.top + 16;
+  if (left + w > st.width - 12) left = cx - st.left - w - 16;
+  if (top + h > st.height - 12) top = st.height - h - 12;
+  pop.style.left = Math.max(12, left) + 'px'; pop.style.top = Math.max(56, top) + 'px';
+}
+function closePop() {
+  if (!S.sel && $('pop').hidden) return;
+  S.sel = null; $('pop').hidden = true;
+  if (S.prep && S.prep.labels) { renderRegions(); drawPreview(); }
+}
+$('popClose').addEventListener('click', closePop);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (!$('pop').hidden) closePop(); else if (S.focus != null) setFocus(null); } });
+document.querySelectorAll('input[name=scope]').forEach(r => r.addEventListener('change', fillPop));
+// Put the selection into an existing color. Pieces are relabeled into that color's region
+// (no new card); a whole detected region is linked with "Same as" so its card can be undone.
+function relabel(from, to, pixels) {
+  const L = S.prep.labels; let n = 0;
+  for (const i of pixels || []) if (L[i] === from) { L[i] = to; n++; }
+  if (!pixels) for (let i = 0; i < L.length; i++) if (L[i] === from) { L[i] = to; n++; }
+  S.regions[from].pixels -= n; S.regions[to].pixels += n;
+}
+function moveSelTo(j) {
+  const sel = S.sel, L = sel.label, r = S.regions[L];
+  if (j === -2) { // flat: reuse an existing flat piece group if there is one
+    const flat = S.regions.findIndex((o, k) => o.split && o.merge === -2 && o.pixels > 0 && k !== L);
+    if (flat < 0) { S.regions[popTarget()].merge = -2; return; }
+    j = flat;
+  }
+  if (j === L) return;
+  const pieceOnly = $('scopePiece').checked && sel.pixels.length < labelCount(L);
+  if (pieceOnly) { relabel(L, j, sel.pixels); sel.label = j; }
+  else if (r.split) { relabel(L, j); sel.label = j; }
+  else r.merge = resolve(j) === L ? -1 : j;
+}
+const rgbDist = (a, b) => { const p = hexToRgb(a), q = hexToRgb(b); return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]); };
+$('popColor').addEventListener('input', () => {
+  const r = S.regions[popTarget()]; r.merge = -1; r.filament = $('popColor').value; r.spool = S.pickedSpool || null;
+  if (r.split && r.spool) r.name = uniqueName(r.spool.name);
+  afterEdit();
+});
+// when the picker closes on a color that is already in use (or nearly), join that color instead of adding one
+$('popColor').addEventListener('change', () => {
+  if (!S.sel) return;
+  const j = matchOwner($('popColor').value, S.pickedSpool, S.sel.label);
+  if (j >= 0) { moveSelTo(j); afterEdit(); }
+});
+$('popH').addEventListener('change', () => {
+  const r = S.regions[popTarget()], e = effectiveRegion(r);
+  if (r.merge !== -1 && !e.flat) { r.filament = e.filament; r.merge = -1; }
+  r.height = Math.max(0.2, Math.min(20, +$('popH').value || 1)); afterEdit();
+});
+$('popSw').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  moveSelTo(+b.dataset.j);
+  afterEdit();
+});
+$('preview').addEventListener('click', e => {
+  const cv = $('preview'), r = cv.getBoundingClientRect();
+  selectAtComposite((e.clientX - r.left) / r.width * cv.width - 0.5, (e.clientY - r.top) / r.height * cv.height - 0.5, e.clientX, e.clientY);
+});
+$('imgView').addEventListener('click', e => { if (e.target === $('imgView')) closePop(); });
+
+// 3D picking: tray mm -> padded grid -> subject pixel
+function pick3D(e) {
+  if (!gl || !S.tray) return;
+  const el = gl.renderer.domElement, r = el.getBoundingClientRect();
+  const ndc = new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  const ray = new THREE.Raycaster(); ray.setFromCamera(ndc, gl.camera);
+  const hit = ray.intersectObjects(gl.group.children, false)[0];
+  if (!hit) { closePop(); return; }
+  const pt = hit.point.clone();
+  if (hit.face && Math.abs(hit.face.normal.z) < 0.5) pt.addScaledVector(hit.face.normal, -0.25); // step into the part from a wall
+  const m = S.tray.map, part = hit.object.userData.id;
+  if (part === QRIM_ID) { pickRim('coasterRim'); return; }
+  if (part === FILL_ID) { pickRim('filler'); return; }
+  if (part === RIM_ID || part === CRIM_ID || part === GAP_ID || part === KRIM_ID) { pickRim(); return; }
+  if (part === TEXT_ID) { pickText(); return; }
+  if (part === STAMP_ID || (S.gen === 'cookie' && part === 'base')) { pickBase(); return; }
+  if (part === 'base' && !onArtPixel(pt, m)) { pickBase(); return; }
+  const [cx, cy] = buildCoords(pt, m);
+  selectAtComposite(cx, cy, e.clientX, e.clientY);
+}
+
+// The base is also hit under engraved pockets and "Leave flat" areas; only route those to the art.
+function onArtPixel(pt, m) {
+  const p = S.prep; if (!p || !p.labels) return false;
+  let [x, y] = buildCoords(pt, m);
+  if (textAt(x, y)) { const tv = $('tFil').value; return tv === '-1' || !effectiveRegion(S.regions[+tv]).flat; }
+  const cmp = composite(); if (cmp) { x -= cmp.ox; y -= cmp.oy; }
+  x = Math.round(x); y = Math.round(y);
+  if (x < 0 || y < 0 || x >= p.width || y >= p.height) return false;
+  if (S.mirror) x = p.width - 1 - x;
+  const l = p.labels[y * p.width + x]; if (!p.mask[y * p.width + x] || l < 0) return false;
+  return !effectiveRegion(S.regions[l]).flat;
+}
+function pickBase() {
+  closePop();
+  if (S.tool === 'paint') {
+    S.pickedSpool = S.paintSpool || null; $('baseColor').value = $('paintColor').value;
+    $('baseColor').dispatchEvent(new Event('input')); S.pickedSpool = null; renderPaintSwatches();
+  } else openSpoolPicker($('baseColor'));
+}
+function pickRim(slot = S.gen) {
+  closePop();
+  if (S.tool === 'paint') { applyRimColor($('paintColor').value, S.paintSpool || null, slot); renderPaintSwatches(); }
+  else { S.rimPickSlot = slot; rimPick.value = rimFill(slot); openSpoolPicker(rimPick); }
+}
+
+// ---------- text layer ----------
+// The text is drawn into a larger copy of the (mirrored) art as one extra colour label, so every generator
+// treats it like any other part: outline, fitting, smoothing, filament, painting and undo all just work.
+S.textC = { color: '#ffffff', spool: null, touched: false };
+let CMP = null;
+const hasText = () => S.gen !== 'cookie' && !!$('tText').value.trim() && !!S.prep && !!S.prep.labels;
+function textFill() { const v = $('tFil').value; if (v !== '-1') { const o = S.regions[+v]; if (o) return effectiveFill(o); } return S.textC.color; }
+function textSpool() { const v = $('tFil').value; if (v !== '-1') { const o = S.regions[+v]; if (o) { const e = effectiveRegion(o); return e.flat ? S.baseSpool : e.spool; } } return S.textC.spool; }
+const textHeight = () => uniform() ? +$('imgH').value : +$('tH').value;
+function syncTextFil() {
+  $('tColor').value = textFill(); // stays clickable: picking a filament here switches the text to its own
+  const sp = textSpool(); $('tSpool').textContent = sp ? spoolLabel(sp) : '';
+}
+function composite() {
+  if (!hasText()) return null;
+  const font = $('tFont').value, key = [S.prep, S.mirror, S.regions.length, $('tText').value, font, $('tPos').value, $('tSize').value, $('tSpace').value, $('tGap').value, S.gen === 'coin', S.fontsTick || 0].join('|');
+  if (CMP && CMP.key === key) return CMP;
+  CMP = makeComposite(mirroredPrep(), S.regions.length, S.gen === 'coin'); CMP.key = key;
+  return CMP;
+}
+function makeComposite(art, TL, symmetric) {
+  const [fam, wt] = $('tFont').value.split('|'), pos = $('tPos').value;
+  const aw = art.width, ah = art.height, lines = $('tText').value.split('\n').map(s => s.trim()).filter(Boolean);
+  const arc = pos.startsWith('arc'), use = arc ? [lines.join(' ')] : lines;
+  const capPx = Math.max(8, +$('tSize').value / 100 * ah), gap = Math.round(+$('tGap').value / 100 * ah);
+  const mc = document.createElement('canvas').getContext('2d');
+  mc.font = `${wt} 100px "${fam}", "Fredoka", sans-serif`;
+  const Hm = mc.measureText('H'), F = 100 * capPx / Math.max(1, Hm.actualBoundingBoxAscent);
+  mc.font = `${wt} ${F}px "${fam}", "Fredoka", sans-serif`;
+  const mt = mc.measureText('HÉgjpy'), A = mt.actualBoundingBoxAscent, D = mt.actualBoundingBoxDescent, sp = +$('tSpace').value / 100 * capPx;
+  const lineW = s => [...s].reduce((w, ch, i) => w + mc.measureText(ch).width + (i ? sp : 0), 0);
+  const pad = Math.ceil(capPx * 0.2) + 2, lg = capPx * 0.3;
+  const Wt = Math.max(1, ...use.map(lineW)), Ht = use.length * (A + D) + (use.length - 1) * lg;
+  let W, H, ox, oy, draw;
+  if (!arc) {
+    const tw = Math.ceil(Wt) + 2 * pad, th = Math.ceil(Ht) + 2 * pad;
+    if (pos === 'over') { W = Math.max(aw, tw); H = Math.max(ah, th); ox = (W - aw) >> 1; oy = (H - ah) >> 1; }
+    else { W = Math.max(aw, tw); H = ah + gap + th; ox = (W - aw) >> 1; oy = pos === 'above' ? gap + th : 0; }
+    const ty = pos === 'over' ? (H - th) / 2 : pos === 'above' ? 0 : ah + gap;
+    draw = c => use.forEach((s, li) => {
+      let x = (W - lineW(s)) / 2; const y = ty + pad + A + li * (A + D + lg);
+      for (const ch of s) { c.fillText(ch, x, y); x += c.measureText(ch).width + sp; }
+    });
+  } else {
+    const Ra = C.artRadiusPx(art), top = pos === 'arc-top';
+    // keep long text to about 170° of arc by pushing it outward instead of wrapping round the sides
+    const Rb = Math.max(Ra + gap + (top ? D : A), lineW(use[0]) / (Math.PI * 170 / 180));
+    const half = Math.ceil(Rb + (top ? A : D) + pad);
+    W = H = 2 * half; ox = Math.round(half - aw / 2); oy = Math.round(half - ah / 2);
+    const s = use[0], span = lineW(s) / Rb;
+    draw = c => { let off = 0; for (const ch of s) {
+      const w = c.measureText(ch).width, th = (off + w / 2) / Rb; off += w + sp;
+      c.save(); c.translate(ox + (aw - 1) / 2, oy + (ah - 1) / 2);
+      if (top) { c.rotate(-span / 2 + th); c.fillText(ch, -w / 2, -Rb); } else { c.rotate(span / 2 - th); c.fillText(ch, -w / 2, Rb); }
+      c.restore(); } };
+  }
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const c = cv.getContext('2d'); c.font = `${wt} ${F}px "${fam}", "Fredoka", sans-serif`; c.textBaseline = 'alphabetic'; c.fillStyle = '#fff';
+  draw(c);
+  const px = c.getImageData(0, 0, W, H).data, N = W * H, textMask = new Uint8Array(N), mask = new Uint8Array(N), labels = new Int16Array(N).fill(-1);
+  for (let y = 0; y < ah; y++) for (let x = 0; x < aw; x++) { const s = y * aw + x, d = (y + oy) * W + x + ox; mask[d] = art.mask[s]; labels[d] = art.labels[s]; }
+  for (let i = 0; i < N; i++) if (px[i * 4 + 3] > 110) { textMask[i] = 1; mask[i] = 1; labels[i] = TL; }
+  let out = { W, H, ox, oy, textMask, capPx, prep: { width: W, height: H, mask, labels } };
+  // trays and keychains size from the bounding box, so trim empty canvas (coins keep the art centred for curved text)
+  if (!symmetric) {
+    let x0 = W, y0 = H, x1 = -1, y1 = -1;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (mask[y * W + x]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    if (x1 >= 0 && (x0 > 0 || y0 > 0 || x1 < W - 1 || y1 < H - 1)) {
+      const w2 = x1 - x0 + 1, h2 = y1 - y0 + 1, t2 = new Uint8Array(w2 * h2), m2 = new Uint8Array(w2 * h2), l2 = new Int16Array(w2 * h2);
+      for (let y = 0; y < h2; y++) for (let x = 0; x < w2; x++) { const s = (y + y0) * W + x + x0, d = y * w2 + x; t2[d] = textMask[s]; m2[d] = mask[s]; l2[d] = labels[s]; }
+      out = { W: w2, H: h2, ox: ox - x0, oy: oy - y0, textMask: t2, capPx, prep: { width: w2, height: h2, mask: m2, labels: l2 } };
+    }
+  }
+  return out;
+}
+function textAt(x, y) {
+  const cmp = composite(); if (!cmp) return false;
+  x = Math.round(x); y = Math.round(y);
+  return x >= 0 && y >= 0 && x < cmp.W && y < cmp.H && !!cmp.textMask[y * cmp.W + x];
+}
+// 3D hit -> coordinates in the image the model was built from (the composite when there is text)
+function buildCoords(pt, m) {
+  if (m.toArt) return m.toArt(pt.x, pt.y);
+  return [(pt.x + m.cx) / m.mmPerPx - m.pad, m.H - 1 - (pt.y + m.cy) / m.mmPerPx - m.pad];
+}
+function selectAtComposite(x, y, clientX, clientY) {
+  if (textAt(x, y)) { pickText(); return; }
+  const cmp = composite(); if (cmp) { x -= cmp.ox; y -= cmp.oy; }
+  selectAt(x, y, clientX, clientY);
+}
+function pickText() {
+  closePop();
+  if (S.tool === 'paint') { applyTextColor($('paintColor').value, S.paintSpool || null); renderPaintSwatches(); }
+  else { syncTextFil(); openSpoolPicker($('tColor')); } // only a real pick switches the text to its own filament
+}
+// reuse a filament already in the model when it matches, otherwise give the text its own
+function applyTextColor(hex, spool) {
+  hex = hex.toLowerCase(); S.textC.touched = true;
+  let j = -1;
+  S.regions.forEach((o, k) => { if (j < 0 && o.merge === -1 && o.pixels > 0 && (spool && o.spool ? spoolKey(spool) === spoolKey(o.spool) : rgbDist(hex, o.filament) < 30)) j = k; });
+  if (j >= 0) $('tFil').value = String(j); else { $('tFil').value = '-1'; S.textC.color = hex; S.textC.spool = spool || null; }
+  textChanged();
+}
+// first time text appears: pick a filament that stands out against the base
+function defaultTextColor() {
+  const lum = h => { const [r, g, b] = hexToRgb(h); return (0.299 * r + 0.587 * g + 0.114 * b) / 255; };
+  const bg = lum(S.gen === 'tray' ? $('baseColor').value : rimFill(S.gen) || $('baseColor').value);
+  let best = -1, bd = 0;
+  S.regions.forEach((o, k) => { if (o.merge !== -1 || !(o.pixels > 0)) return; const d = Math.abs(lum(o.filament) - bg); if (d > bd) { bd = d; best = k; } });
+  if (best >= 0 && bd > 0.45) $('tFil').value = String(best);
+  else { $('tFil').value = '-1'; S.textC.color = bg < 0.5 ? '#ffffff' : '#111111'; S.textC.spool = null; }
+}
+function textChanged() { syncTextFil(); renderTally(); drawPreview(); scheduleBuild(); }
+function syncTextUI() {
+  $('tOpts').hidden = !$('tText').value.trim();
+  $('tGapField').hidden = $('tPos').value === 'over';
+  $('tHField').hidden = !raisedArt() || uniform();
+}
+function textSizeReadout(mmPerPx) {
+  const cmp = composite(), el = $('tSizeHint');
+  if (!cmp || !mmPerPx) { el.textContent = "Height of a capital letter as a share of the art's height."; el.classList.remove('warn'); return; }
+  const mm = cmp.capPx * mmPerPx;
+  el.textContent = mm < 4 ? `Capital letters come out about ${mm.toFixed(1)} mm tall. Under about 4 mm they're hard to print cleanly.` : `Capital letters come out about ${mm.toFixed(1)} mm tall.`;
+  el.classList.toggle('warn', mm < 4);
+}
+$('tText').addEventListener('input', () => {
+  if (hasText() && !S.textC.touched) { defaultTextColor(); S.textC.touched = true; }
+  syncTextUI(); textChanged();
+});
+['tFont', 'tPos'].forEach(id => $(id).addEventListener('change', () => { syncTextUI(); textChanged(); loadTextFont(); }));
+['tSize', 'tSpace', 'tGap', 'tH'].forEach(id => $(id).addEventListener('input', textChanged));
+$('tFil').addEventListener('change', () => { S.textC.touched = true; textChanged(); });
+$('tColor').addEventListener('input', () => { S.textC.color = $('tColor').value; S.textC.spool = S.pickedSpool || null; S.textC.touched = true; $('tFil').value = '-1'; textChanged(); });
+// web fonts arrive after first paint; redraw the text once the chosen font is ready
+function loadTextFont() {
+  if (!document.fonts || !document.fonts.load) return;
+  const [fam, wt] = $('tFont').value.split('|');
+  document.fonts.load(`${wt} 100px "${fam}"`, $('tText').value || 'Aa').then(() => { S.fontsTick = (S.fontsTick || 0) + 1; if (hasText()) textChanged(); }).catch(() => {});
+}
+loadTextFont();
+
+// ---------- paint tool: pick a color, click parts ----------
+S.tool = 'select';
+function setTool(t) {
+  S.tool = t; closePop();
+  $('toolSelect').setAttribute('aria-pressed', t === 'select'); $('toolPaint').setAttribute('aria-pressed', t === 'paint');
+  $('paintChip').hidden = $('paintSw').hidden = t !== 'paint';
+  $('toolTip').textContent = t === 'paint' ? 'Click parts to fill them' : 'Click a part to edit it';
+  document.body.classList.toggle('painting', t === 'paint');
+  renderPaintSwatches();
+}
+function renderPaintSwatches() {
+  if (S.tool !== 'paint') return;
+  const cur = $('paintColor').value.toLowerCase();
+  const seen = new Set(), owners = [];
+  S.regions.forEach((r, j) => { if (r.merge !== -1 || !(r.pixels > 0)) return; const key = r.spool ? spoolKey(r.spool) : r.filament.toLowerCase(); if (!seen.has(key)) { seen.add(key); owners.push([r, j]); } });
+  $('paintSw').innerHTML = owners.map(([r, j]) => { const lbl = r.spool ? spoolLabel(r.spool) : r.name; return `<button type="button" data-j="${j}" style="background:${swatchBg(r)}" title="${escapeHtml(lbl)}" aria-label="Paint with ${escapeHtml(lbl)}" aria-pressed="${r.filament.toLowerCase() === cur && (!S.paintSpool || spoolKey(S.paintSpool) === (r.spool && spoolKey(r.spool)))}"></button>`; }).join('');
+}
+function uniqueName(base) {
+  const names = new Set(S.regions.filter(r => r.pixels > 0).map(r => r.name));
+  if (!names.has(base)) return base;
+  for (let n = 2; ; n++) if (!names.has(`${base} ${n}`)) return `${base} ${n}`;
+}
+function paintPiece(pixels, label) {
+  const color = $('paintColor').value.toLowerCase(), spool = S.paintSpool || null;
+  S.sel = { pixels, label }; $('scopePiece').checked = true;
+  const j = matchOwner(color, spool, -1);
+  if (j >= 0) { if (resolve(label) !== j) moveSelTo(j); }
+  else {
+    const idx = popTarget(), r = S.regions[idx];
+    r.merge = -1; r.filament = color; r.spool = spool;
+    if (r.split) r.name = uniqueName(spool ? spool.name : colorName(color));
+  }
+  S.sel = null;
+  afterEdit(); renderPaintSwatches();
+}
+$('toolSelect').addEventListener('click', () => setTool('select'));
+$('toolPaint').addEventListener('click', () => setTool('paint'));
+$('paintColor').addEventListener('input', () => { S.paintSpool = S.pickedSpool || null; renderPaintSwatches(); });
+$('paintSw').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; const o = S.regions[+b.dataset.j]; $('paintColor').value = o.filament; S.paintSpool = o.spool || null; renderPaintSwatches(); });
+
+// ---------- SpoolmanDB filament picker ----------
+// Built-in snapshot of SpoolmanDB (MIT, github.com/Donkie/SpoolmanDB); refreshed live when the network allows.
+// house brands sold under another name: searching or filtering by the alias finds the maker's filaments
+const BRAND_ALIASES = { Polymaker: ['Snapmaker'] };
+const SP = { list: [], brands: [], mats: [], source: '', target: null, input: null, loadedLive: false };
+(function loadSnapshot() {
+  try {
+    const d = JSON.parse($('spoolmandb').textContent);
+    SP.list = d.f.map(([b, m, name, hx, fin, fl]) => mkSpool(d.b[b], d.m[m], name, hx.split('/').map(h => '#' + h), fin, fl));
+    SP.source = 'SpoolmanDB (built-in, ' + d.date + ')';
+  } catch (e) { SP.list = []; SP.source = 'Filament list unavailable'; }
+  indexSpools();
+})();
+function mkSpool(brand, material, name, hexes, finish, flags) {
+  const s = { brand, material, name, hexes, hex: hexes[0], finish: finish || '', translucent: (flags || '').includes('t'), glow: (flags || '').includes('g') };
+  s.hay = `${brand} ${(BRAND_ALIASES[brand] || []).join(' ')} ${material} ${name} ${s.finish} ${s.translucent ? 'translucent transparent clear' : ''} ${s.glow ? 'glow' : ''}`.toLowerCase();
+  s.lab = labOf(s.hex);
+  return s;
+}
+function indexSpools() {
+  SP.brands = [...new Set(SP.list.map(s => s.brand))].sort((x, y) => x.localeCompare(y, undefined, { sensitivity: 'base' }));
+  const common = ['PLA', 'PLA+', 'PETG', 'ABS', 'ASA', 'TPU', 'PCTG'];
+  const counts = {}; SP.list.forEach(s => counts[s.material] = (counts[s.material] || 0) + 1);
+  SP.mats = [...common.filter(m => counts[m]), ...Object.keys(counts).filter(m => !common.includes(m)).sort()];
+}
+async function tryLiveDB() {
+  if (SP.loadedLive || SP.tried) return; SP.tried = true;
+  try {
+    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 8000);
+    const res = await fetch('https://donkie.github.io/SpoolmanDB/filaments.json', { signal: ctl.signal });
+    clearTimeout(t);
+    if (!res.ok) return;
+    const rows = await res.json(), seen = new Set(), list = [];
+    for (const r of rows) {
+      if (r.diameter && Math.abs(r.diameter - 1.75) > 0.01) continue;
+      const hexes = r.color_hexes && r.color_hexes.length ? r.color_hexes : (r.color_hex ? [r.color_hex] : []);
+      if (!hexes.length) continue;
+      const key = `${r.manufacturer}|${r.material}|${r.name}`.toLowerCase(); if (seen.has(key)) continue; seen.add(key);
+      list.push(mkSpool(r.manufacturer, r.material, r.name, hexes.map(h => '#' + String(h).replace('#', '').slice(0, 6).toLowerCase()), r.finish, (r.translucent ? 't' : '') + (r.glow ? 'g' : '')));
+    }
+    if (list.length > 100) { SP.list = list; SP.loadedLive = true; SP.source = 'SpoolmanDB (live)'; indexSpools(); if (!$('spBack').hidden) { fillSpFilters(); renderSpList(); } }
+  } catch (e) { /* offline or blocked: keep the built-in list */ }
+}
+function labOf(hex) {
+  const [r, g, b] = hexToRgb(hex).map(v => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+  const f = t => t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116;
+  const x = f((r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047), y = f(r * 0.2126 + g * 0.7152 + b * 0.0722), z = f((r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883);
+  return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
+}
+const spoolKey = s => `${s.brand}|${s.material}|${s.name}`.toLowerCase();
+const spoolLabel = s => `${s.brand} ${s.material} ${s.name}`;
+const swatchCss = s => s.hexes && s.hexes.length > 1 ? `linear-gradient(135deg, ${s.hexes.join(', ')})` : s.hex;
+function swatchBg(r) { return r.spool ? swatchCss(r.spool) : r.filament; }
+function spoolForHex(c) {
+  if ($('baseColor').value.toLowerCase() === c && S.baseSpool) return spoolLabel(S.baseSpool);
+  const r = S.regions.find(o => o.merge === -1 && o.pixels > 0 && o.filament.toLowerCase() === c);
+  return r ? (r.spool ? spoolLabel(r.spool) : r.name) : c;
+}
+// which existing filament should a pick join? same spool > unassigned near color (takes the spool) > near color for custom picks
+function matchOwner(hex, spool, exclude) {
+  let best = -1, bd = 30;
+  S.regions.forEach((o, j) => {
+    if (j === exclude || o.merge !== -1 || !(o.pixels > 0)) return;
+    if (spool && o.spool) { if (spoolKey(o.spool) === spoolKey(spool)) { best = j; bd = -1; } return; }
+    const d = rgbDist(hex, o.filament); if (d < bd) { bd = d; best = j; }
+  });
+  if (best >= 0 && spool && !S.regions[best].spool) { S.regions[best].spool = spool; S.regions[best].filament = hex; }
+  return best;
+}
+function recentSpools() { try { return JSON.parse(localStorage.getItem('ttm.recentSpools') || '[]'); } catch (e) { return []; } }
+function pushRecent(s) {
+  try {
+    const keep = { brand: s.brand, material: s.material, name: s.name, hexes: s.hexes, hex: s.hex, finish: s.finish };
+    const list = [keep, ...recentSpools().filter(x => spoolKey(x) !== spoolKey(s))].slice(0, 10);
+    localStorage.setItem('ttm.recentSpools', JSON.stringify(list));
+  } catch (e) { }
+}
+function fillSpFilters() {
+  const b = $('spBrand').value, m = $('spMat').value;
+  const opts = SP.brands.map(x => [x, x]);
+  for (const [maker, aliases] of Object.entries(BRAND_ALIASES)) if (SP.brands.includes(maker)) aliases.forEach(al => opts.push([`${al} (made by ${maker})`, maker, al]));
+  opts.sort((p, q) => p[0].localeCompare(q[0], undefined, { sensitivity: 'base' }));
+  $('spBrand').innerHTML = '<option value="">All brands</option>' + opts.map(([lbl, val, al]) => `<option value="${escapeHtml(val)}"${al ? ` data-alias="${escapeHtml(al)}"` : ''}>${escapeHtml(lbl)}</option>`).join('');
+  $('spMat').innerHTML = '<option value="">All materials</option>' + SP.mats.map(x => `<option>${escapeHtml(x)}</option>`).join('');
+  $('spBrand').value = SP.brands.includes(b) ? b : '';
+  $('spMat').value = SP.mats.includes(m) ? m : '';
+  $('spSrc').textContent = 'Filament data: ' + SP.source;
+}
+function spRow(s, showDe) {
+  const tags = [s.finish, s.translucent ? 'translucent' : '', s.glow ? 'glow' : ''].filter(Boolean).join(' · ');
+  const de = showDe && SP.targetLab ? Math.round(Math.hypot(s.lab[0] - SP.targetLab[0], s.lab[1] - SP.targetLab[1], s.lab[2] - SP.targetLab[2])) : null;
+  return `<button type="button" class="sp-row" data-k="${escapeHtml(spoolKey(s))}"><span class="sw" style="background:${swatchCss(s)}"></span><span><b>${escapeHtml(s.name)}</b><small>${escapeHtml(s.brand)} · ${escapeHtml(s.material)}${tags ? ' · ' + escapeHtml(tags) : ''}</small></span>${de != null ? `<span class="de" title="Color difference from current (lower is closer)">Δ${de}</span>` : '<span></span>'}</button>`;
+}
+function renderSpList() {
+  const q = $('spQ').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const b = $('spBrand').value, m = $('spMat').value, closest = $('spClosest').checked && SP.targetLab;
+  let list = SP.list.filter(s => (!b || s.brand === b) && (!m || s.material === m) && q.every(t => s.hay.includes(t)));
+  if (closest) { const T = SP.targetLab; list.forEach(s => s._d = (s.lab[0] - T[0]) ** 2 + (s.lab[1] - T[1]) ** 2 + (s.lab[2] - T[2]) ** 2); list.sort((x, y) => x._d - y._d); }
+  else list.sort((x, y) => x.brand.localeCompare(y.brand) || x.material.localeCompare(y.material) || x.name.localeCompare(y.name));
+  const LIM = 250;
+  $('spCount').textContent = `${list.length.toLocaleString()} filament${list.length === 1 ? '' : 's'}`;
+  SP.shown = new Map(list.slice(0, LIM).map(s => [spoolKey(s), s]));
+  $('spList').innerHTML = list.length ? list.slice(0, LIM).map(s => spRow(s, closest)).join('') + (list.length > LIM ? `<div class="sp-more">Showing the first ${LIM}. Search or filter to narrow it down.</div>` : '')
+    : '<div class="sp-more">No filaments match. Try fewer words, or use a custom color below.</div>';
+  const rec = recentSpools();
+  SP.recent = new Map(rec.map(s => [spoolKey(s), s]));
+  $('spRecent').innerHTML = rec.map(s => `<button type="button" data-k="${escapeHtml(spoolKey(s))}" title="${escapeHtml(spoolLabel(s))}"><span class="sw sm" style="background:${swatchCss(s)}"></span><span>${escapeHtml(s.brand)} ${escapeHtml(s.name)}</span></button>`).join('');
+}
+function openSpoolPicker(input) {
+  SP.input = input;
+  SP.targetLab = labOf(input.value || '#888888');
+  $('spCustom').value = input.value || '#888888';
+  fillSpFilters(); renderSpList();
+  $('spBack').hidden = false;
+  setTimeout(() => $('spQ').focus(), 0);
+  tryLiveDB();
+}
+function closeSpoolPicker() { $('spBack').hidden = true; if (SP.input) SP.input.focus({ preventScroll: true }); SP.input = null; }
+function applyPick(hex, spool) {
+  const input = SP.input; closeSpoolPicker(); if (!input) return;
+  if (spool) pushRecent(spool);
+  S.pickedSpool = spool || null;
+  input.value = hex;
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+  S.pickedSpool = null;
+}
+// every filament color box in the app opens the picker instead of the plain color dialog
+document.addEventListener('click', e => {
+  const inp = e.target.closest('input[type=color]');
+  if (!inp || inp.hasAttribute('data-native') || inp.disabled) return;
+  e.preventDefault(); openSpoolPicker(inp);
+}, true);
+document.addEventListener('keydown', e => {
+  const inp = e.target.closest && e.target.closest('input[type=color]');
+  if (inp && !inp.hasAttribute('data-native') && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openSpoolPicker(inp); }
+}, true);
+['spQ'].forEach(id => $(id).addEventListener('input', renderSpList));
+['spBrand', 'spMat', 'spClosest'].forEach(id => $(id).addEventListener('change', renderSpList));
+$('spList').addEventListener('click', e => { const b = e.target.closest('.sp-row'); if (!b) return; const s = SP.shown.get(b.dataset.k); if (s) applyPick(s.hex, s); });
+$('spRecent').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; const s = SP.recent.get(b.dataset.k); if (s) applyPick(s.hex, s); });
+$('spUseCustom').addEventListener('click', () => applyPick($('spCustom').value, null));
+$('spClose').addEventListener('click', closeSpoolPicker);
+$('spBack').addEventListener('click', e => { if (e.target === $('spBack')) closeSpoolPicker(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('spBack').hidden) { e.stopImmediatePropagation(); closeSpoolPicker(); } }, true);
+
+// ---------- highlight one filament ----------
+// S.focus: region index, 'base', or null. Everything printed in that filament stays lit; the rest dims.
+function focusColor() {
+  if (S.focus == null) return null;
+  if (S.focus === 'base') return $('baseColor').value.toLowerCase();
+  const r = S.regions[S.focus]; return r && r.pixels > 0 ? effectiveFill(r).toLowerCase() : null;
+}
+function setFocus(f) {
+  S.focus = f;
+  if (focusColor() == null) S.focus = null;
+  document.querySelectorAll('.region').forEach(el => el.classList.toggle('focused', +el.dataset.i === S.focus));
+  $('baseRow').classList.toggle('focused', S.focus === 'base');
+  refreshFocusChip();
+  drawPreview(); applyFocus3D();
+}
+function refreshFocusChip() {
+  const c = focusColor();
+  if (!c) S.focus = null;
+  $('focusChip').hidden = !c; $('clickHint').hidden = !S.prep;
+  if (c) {
+    $('focusSw').style.background = c;
+    $('focusTxt').textContent = 'Showing ' + (S.focus === 'base' ? 'Base' : S.regions[S.focus].name) + ' filament';
+  }
+}
+function focusPixels() {
+  const c = focusColor(), p = S.prep; if (!c || !p || !p.labels) return null;
+  const base = $('baseColor').value.toLowerCase();
+  const fill = S.regions.map(r => effectiveFill(r).toLowerCase());
+  const out = [];
+  for (let i = 0; i < p.labels.length; i++) { const l = p.labels[i]; if (!p.mask[i]) continue; if ((l >= 0 ? fill[l] : base) === c) out.push(i); }
+  return out;
+}
+function applyFocus3D() {
+  if (!gl) return;
+  const c = focusColor(), dim = new THREE.Color('#23272e').convertSRGBToLinear();
+  gl.group.children.forEach(m => {
+    const own = m.userData.color, on = !c || own === c;
+    m.material.color.copy(new THREE.Color(own).convertSRGBToLinear());
+    if (!on) m.material.color.lerp(dim, 0.82);
+    m.material.transparent = !on; m.material.opacity = on ? 1 : 0.35; m.material.depthWrite = on;
+    m.material.needsUpdate = true;
+  });
+}
+$('focusClear').addEventListener('click', () => setFocus(null));
+$('baseRow').addEventListener('click', ev => { if (ev.target.closest('input')) return; setFocus(S.focus === 'base' ? null : 'base'); });
+
+// ---------- preview ----------
+function drawPreview() {
+  if (!S.prep) return;
+  const src = subjectCanvas(S.mirror, !!S.prep.labels, S.sel ? S.sel.pixels : focusPixels()), cv = $('preview');
+  const cmp = S.prep.labels ? composite() : null;
+  if (!cmp) { cv.width = src.width; cv.height = src.height; cv.getContext('2d').drawImage(src, 0, 0); }
+  else {
+    cv.width = cmp.W; cv.height = cmp.H;
+    const cx = cv.getContext('2d'); cx.drawImage(src, cmp.ox, cmp.oy);
+    const fc = focusColor(), dim = (S.sel && S.sel.text !== true) || (fc && fc !== textFill().toLowerCase());
+    const [r, g, b] = hexToRgb(textFill()), id = cx.getImageData(0, 0, cmp.W, cmp.H), d = id.data;
+    for (let i = 0; i < cmp.textMask.length; i++) if (cmp.textMask[i]) {
+      d[i * 4] = dim ? r * 0.35 + 23 : r; d[i * 4 + 1] = dim ? g * 0.35 + 25 : g; d[i * 4 + 2] = dim ? b * 0.35 + 30 : b; d[i * 4 + 3] = 255;
+    }
+    cx.putImageData(id, 0, 0);
+  }
+  cv.hidden = false; $('emptyMsg').hidden = true;
+}
+
+let gl = null;
+function initGL() {
+  if (gl || !window.THREE) return gl;
+  const host = $('glView');
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  host.appendChild(renderer.domElement);
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--bed').trim() || '#23272e');
+  const camera = new THREE.PerspectiveCamera(35, 1, 1, 5000);
+  camera.up.set(0, 0, 1);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x404650, 0.9));
+  const key = new THREE.DirectionalLight(0xffffff, 0.8); key.position.set(-120, -160, 260); scene.add(key);
+  const rimL = new THREE.DirectionalLight(0xffffff, 0.3); rimL.position.set(150, 200, 80); scene.add(rimL);
+  const grid = new THREE.GridHelper(300, 30, 0x343a44, 0x2a2f37); grid.rotation.x = Math.PI / 2; grid.position.z = -0.05; scene.add(grid);
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  const group = new THREE.Group(); scene.add(group);
+  let down = null;
+  renderer.domElement.addEventListener('pointerdown', e => { down = [e.clientX, e.clientY]; });
+  renderer.domElement.addEventListener('pointerup', e => { if (down && Math.hypot(e.clientX - down[0], e.clientY - down[1]) < 5) pick3D(e); down = null; });
+  gl = { renderer, scene, camera, controls, group, framed: false };
+  const resize = () => { const w = host.clientWidth, h = host.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); };
+  new ResizeObserver(resize).observe(host); resize();
+  (function loop() {
+    if (!alive()) { renderer.dispose(); try { renderer.forceContextLoss(); } catch (e) { } return; }
+    requestAnimationFrame(loop); if (!host.hidden) { controls.update(); renderer.render(scene, camera); }
+  })();
+  return gl;
+}
+function showTray(res) {
+  if (!initGL()) return;
+  const g = gl.group;
+  while (g.children.length) { const m = g.children.pop(); m.geometry.dispose(); m.material.dispose(); }
+  partList().forEach(p => {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(p.mesh.positions, 3));
+    geo.setIndex(new THREE.BufferAttribute(p.mesh.indices, 1));
+    const mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(p.color).convertSRGBToLinear(), roughness: 0.62, metalness: 0.02, flatShading: true });
+    const mesh = new THREE.Mesh(geo, mat); mesh.userData.color = p.color.toLowerCase(); mesh.userData.id = p.id; g.add(mesh);
+  });
+  applyFocus3D();
+  if (!gl.framed) {
+    const d = Math.max(res.size[0], res.size[1]);
+    const k = S.gen === 'tray' ? 1.15 : 1.7; // small flat models read best from a bit further back
+    gl.camera.position.set(0, -d * k, d * k * 0.95); gl.controls.target.set(0, 0, S.gen === 'tray' ? 2 : 1); gl.controls.update(); gl.framed = true;
+  }
+  if (!S.autoSwitched && !S.tabPicked && !S.sel) { S.autoSwitched = true; setView('3d'); }
+}
+function setView(v) {
+  if (v !== S.view) closePop();
+  S.view = v;
+  $('tabImg').setAttribute('aria-selected', v === 'img'); $('tab3d').setAttribute('aria-selected', v === '3d');
+  $('imgView').hidden = v !== 'img'; $('glView').hidden = v !== '3d';
+  $('dims').hidden = v !== '3d';
+  if (v === '3d') { initGL(); window.dispatchEvent(new Event('resize')); }
+}
+$('tabImg').addEventListener('click', () => { S.tabPicked = true; setView('img'); });
+$('tab3d').addEventListener('click', () => { S.tabPicked = true; setView('3d'); });
+
+// ---------- downloads ----------
+// Inside claude.ai the viewer's save API only accepts some extensions, so 3MF/STL go out zipped there.
+let dlApi = null, dlChecked = false;
+const dlReady = (window.claude && window.claude.use) ? window.claude.use('downloads').then(d => { dlApi = d; dlChecked = true; markZipped(); }).catch(() => { dlChecked = true; }) : Promise.resolve();
+function markZipped() {
+  if (!dlApi) return;
+  $('dl3mfNote').textContent = 'one part per color, zipped';
+  $('dlStlNote').textContent = 'no colors, zipped';
+}
+// Desktop build (Neutralino): native Save dialog and direct file write; returns true when handled.
+const DESKTOP = typeof window.Neutralino === 'object' && typeof window.NL_OS === 'string';
+if (DESKTOP) document.addEventListener('click', e => {
+  const a = e.target.closest && e.target.closest('a[target=_blank]'); if (!a) return;
+  e.preventDefault(); Neutralino.os.open(a.href).catch(() => { });
+});
+async function desktopSave(filename, bytes) {
+  const ext = (filename.match(/\.([a-z0-9]+)$/i) || [, ''])[1].toLowerCase();
+  const kind = { '3mf': '3MF model', stl: 'STL model', zip: 'Zip archive' }[ext] || 'File';
+  let dir = '';
+  try { dir = await Neutralino.storage.getData('saveDir'); } catch (e) { }
+  if (!dir) { try { dir = await Neutralino.os.getPath('documents'); } catch (e) { } }
+  const sep = window.NL_OS === 'Windows' ? '\\' : '/';
+  let path;
+  try { path = await Neutralino.os.showSaveDialog('Save ' + kind, { defaultPath: dir ? dir + sep + filename : filename, filters: [{ name: kind, extensions: [ext] }] }); }
+  catch (e) { status('Save dialog unavailable: ' + (e.message || e.code || e)); return true; }
+  if (!path) return true; // cancelled
+  if (ext && !path.toLowerCase().endsWith('.' + ext)) path += '.' + ext;
+  try {
+    const buf = bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength ? bytes.buffer : bytes.slice().buffer;
+    await Neutralino.filesystem.writeBinaryFile(path, buf);
+    const cut = Math.max(path.lastIndexOf('\\'), path.lastIndexOf('/'));
+    try { await Neutralino.storage.setData('saveDir', path.slice(0, cut)); } catch (e) { }
+    status('Saved ' + path.slice(cut + 1)); setTimeout(() => { if ($('status').textContent.startsWith('Saved ')) status(''); }, 2500);
+  } catch (e) { status('Could not save: ' + (e.message || e.code || e)); }
+  return true;
+}
+async function save(filename, bytes) {
+  if (DESKTOP) return desktopSave(filename, bytes);
+  await dlReady;
+  if (dlApi) {
+    const allowed = /\.(zip|txt|json|png|svg|html)$/i.test(filename);
+    const fname = allowed ? filename : filename + '.zip';
+    const data = allowed ? bytes : C.zip([{ name: filename, data: bytes }]);
+    try { await dlApi.save({ filename: fname, data: new Blob([data]) }); status(''); }
+    catch (e) { if (e && e.code !== 'declined') status('Download unavailable here: ' + (e.message || e.code)); }
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
+  a.download = filename; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+const slug = s => s.toLowerCase().replace(/[^\w]+/g, '-').replace(/^-|-$/g, '') || 'part';
+// user-chosen base name: drop any extension they typed and characters file systems reject
+function fileBase() {
+  const v = $('fileName').value.trim().replace(/\.(3mf|stl|zip|svg)$/i, '').replace(/[\\/:*?"<>|\x00-\x1f]+/g, '_').replace(/^\.+/, '').slice(0, 80);
+  return v || 'tray';
+}
+$('fileName').addEventListener('change', () => { $('fileName').value = fileBase(); });
+$('fileName').addEventListener('keydown', e => { if (e.key === 'Enter' && !ORCA) { e.preventDefault(); $('dl3mf').click(); } });
+[['dl3mf', '.3mf'], ['dlZip', '_parts.zip'], ['dlStl', '.stl']].forEach(([id, ext]) => {
+  ['mouseenter', 'focus'].forEach(ev => $(id).addEventListener(ev, () => { $('fileExt').textContent = ext; }));
+});
+// face down: turn the model over (half a turn about the Y axis) so the colored face lies on the plate.
+// A rotation, not a mirror, so the art reads correctly once the print is picked up and turned over.
+function magnetHint() {
+  if (S.gen !== 'magnet' || !S.tray) return;
+  const res = S.tray, hid = $('mStyle').value === 'hidden', fd = faceDownOn();
+  const thin = (res.warnings || []).some(w => w.startsWith('Not enough thickness'));
+  // face down the pocket's floor (0.6 mm from the back) becomes its ceiling, so pause just below it
+  const pz = res.pauseZ == null ? null : fd ? res.height - 0.6 : res.pauseZ;
+  $('mHint').textContent = thin ? 'Raise the thickness first so the full magnet fits below the colors.'
+    : hid && pz != null
+    ? `Add a pause at ${pz.toFixed(2)} mm in your slicer, drop the magnet${res.pockets === 1 ? '' : 's'} in, then resume. Check polarity first if the magnets need to face the same way.`
+    : fd ? 'Pockets open on the top as it prints, sized to the magnet plus the clearance. Glue the magnets in after printing; no supports needed.'
+    : 'Pockets are cut into the back, sized to the magnet plus the clearance. Glue the magnets in after printing.';
+}
+// colour parts from darkest to lightest (thin dark lines may widen over lighter colours)
+function darkToLight() {
+  const ids = S.regions.map((r, i) => [i, r]).filter(([, r]) => r.merge === -1 && r.pixels > 0).map(([i, r]) => [i, labOf(effectiveFill(r))[0]]);
+  if (hasText()) ids.push([TEXT_ID, labOf(textFill())[0]]);
+  return ids.sort((a, b) => a[1] - b[1]).map(x => x[0]);
+}
+function faceDownOn() { return FLAT.has(S.gen) && S.gen !== 'coaster' && $('kFaceDown').checked; }
+function exportParts() {
+  const parts = partList(); if (!faceDownOn() || !S.tray) return parts;
+  const T = S.tray.height;
+  return parts.map(p => {
+    const q = p.mesh.positions, o = new Float32Array(q.length);
+    for (let i = 0; i < q.length; i += 3) { o[i] = -q[i]; o[i + 1] = q[i + 1]; o[i + 2] = T - q[i + 2]; }
+    return { ...p, mesh: { positions: o, indices: p.mesh.indices } };
+  });
+}
+$('dl3mf').addEventListener('click', () => save(fileBase() + '.3mf', C.threeMF(exportParts())));
+$('dlStl').addEventListener('click', () => save(fileBase() + '.stl', C.stlBinary(exportParts().map(p => p.mesh))));
+// ---------- filament slots ----------
+// Every distinct filament color gets an Orca filament slot. Inside the Orca plugin the slots are the
+// filaments loaded in Orca (closest color picked by default); elsewhere they are plain slot numbers.
+function slotColors() {
+  if (S.gen === 'cookie' && S.tray) return [...new Set(partList().map(p => p.color.toLowerCase()))];
+  const set = new Set(usedFilaments());
+  partList().forEach(p => set.add(p.color.toLowerCase()));
+  return [...set];
+}
+function nearestSlot(hex) {
+  const a = labOf(hex); let best = 0, bd = Infinity;
+  S.orcaSlots.forEach((sl, i) => {
+    if (!/^#[0-9a-f]{6}$/i.test(sl.color)) return;
+    const b = labOf(sl.color), d = (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
+    if (d < bd) { bd = d; best = i; }
+  });
+  return best + 1;
+}
+function slotFor(hex, colors = slotColors()) {
+  hex = hex.toLowerCase();
+  const max = S.orcaSlots ? S.orcaSlots.length : S.maxSlots, pick = S.slotPick[hex];
+  if (pick >= 1 && pick <= max) return pick;
+  if (S.orcaSlots) return nearestSlot(hex);
+  return Math.min(max, Math.max(1, colors.indexOf(hex) + 1));
+}
+function renderSlots() {
+  const box = $('slotBox'); if (!box) return;
+  if (!S.prep) { box.hidden = true; return; }
+  const colors = slotColors(), orca = S.orcaSlots;
+  box.hidden = !colors.length;
+  $('slotSrc').textContent = orca ? `${orca.length} filament${orca.length === 1 ? '' : 's'} loaded in Orca` + (orca.length < colors.length ? `. Add ${colors.length - orca.length} more in Orca and press Refresh to give every color its own slot.` : '') : 'for Orca Slicer';
+  const n = orca ? orca.length : S.maxSlots;
+  $('slotRows').innerHTML = colors.map(hex => {
+    const cur = slotFor(hex, colors), label = escapeHtml(spoolForHex(hex) === hex ? colorName(hex) : spoolForHex(hex));
+    const opts = Array.from({ length: n }, (_, i) => `<option value="${i + 1}"${i + 1 === cur ? ' selected' : ''}>${orca ? `${i + 1} · ${escapeHtml(orca[i].name || 'Filament')}` : 'Slot ' + (i + 1)}</option>`).join('');
+    const target = orca && orca[cur - 1] ? `<span class="sw slotc" style="background:${escapeHtml(orca[cur - 1].color)}" title="Orca slot ${cur}"></span>` : '';
+    return `<div class="slot-row"><span class="sw" style="background:${hex}"></span><span class="nm" title="${label}">${label}</span><span class="to" aria-hidden="true">→</span>${target}<select data-hex="${hex}" aria-label="Filament slot for ${label}">${opts}</select></div>`;
+  }).join('');
+}
+$('slotRows').addEventListener('change', e => {
+  const sel = e.target.closest('select[data-hex]'); if (!sel) return;
+  S.slotPick[sel.dataset.hex] = +sel.value; renderSlots();
+});
+function orcaParts() {
+  const colors = slotColors();
+  return exportParts().map(p => ({ name: p.name, extruder: slotFor(p.color, colors), mesh: p.mesh }));
+}
+// compress each archive entry with the browser's deflate when it has one (stored otherwise)
+async function deflateFiles(files) {
+  if (typeof CompressionStream !== 'function') return files;
+  try {
+    return await Promise.all(files.map(async f => {
+      const buf = await new Response(new Blob([f.data]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer();
+      return { ...f, deflated: new Uint8Array(buf) };
+    }));
+  } catch (e) { return files; }
+}
+async function orcaFile() { return C.zip(await deflateFiles(C.orca3MFFiles(orcaParts(), fileBase()))); }
+$('dlOrca').addEventListener('click', async () => save(fileBase() + '.3mf', await orcaFile()));
+
+// ---------- inside the Orca Slicer plugin ----------
+if (ORCA) {
+  document.body.classList.add('orca');
+  // Orca adds generic form styles for plugin pages; this page brings its own
+  const od = document.getElementById('orca-plugin-defaults'); if (od) od.remove();
+  // follow Orca's light/dark theme and accent color
+  const root = document.documentElement;
+  const syncTheme = () => { const t = root.getAttribute('data-orca-theme'); if (t === 'dark' || t === 'light') root.dataset.theme = t; };
+  syncTheme(); new MutationObserver(syncTheme).observe(root, { attributes: true, attributeFilter: ['data-orca-theme'] });
+  root.style.setProperty('--focus', 'var(--orca-accent, #009688)');
+  document.addEventListener('click', e => {
+    const a = e.target.closest && e.target.closest('a[target=_blank]'); if (!a) return;
+    e.preventDefault(); window.orca.postMessage({ cmd: 'open', url: a.href });
+  });
+  const askSlots = () => { if (alive()) window.orca.postMessage({ cmd: 'hello' }); };
+  $('slotRefresh').addEventListener('click', askSlots);
+  // Reset: the plugin sends a fresh copy of this page, which replaces the document in place.
+  // (A plain reload shows a blank page in Orca on Windows, where the page has no URL to reload.)
+  // With work on screen it takes a second click.
+  let resetTimer = 0, resetAsked = false;
+  const resetPage = html => {
+    const root = document.documentElement, theme = root.getAttribute('data-orca-theme');
+    const vars = document.getElementById('orca-host-theme-vars');
+    // keep Orca's theme colors, which it injected when the page first loaded
+    if (vars) html = html.replace(/<head>/i, '<head>' + vars.outerHTML);
+    if (theme) html = html.replace(/<html\b/i, `<html data-orca-theme="${theme === 'dark' ? 'dark' : 'light'}"`);
+    window.__mgRun++; // stops this copy: its render loop and message handler check alive()
+    try { document.open(); document.write(html); document.close(); }
+    catch (e) { window.orca.postMessage({ cmd: 'log', text: 'reset write failed: ' + e }); location.reload(); }
+  };
+  $('resetBtn').addEventListener('click', () => {
+    const btn = $('resetBtn'), label = btn.querySelector('span');
+    if (!S.img || btn.classList.contains('armed')) {
+      clearTimeout(resetTimer); btn.classList.remove('armed'); label.textContent = 'Resetting…'; btn.disabled = true;
+      resetAsked = true; window.orca.postMessage({ cmd: 'reset' });
+      setTimeout(() => { if (alive()) { resetAsked = false; btn.disabled = false; label.textContent = 'Reset'; status('Reset did not get an answer from the plugin. Try again.'); } }, 8000);
+      return;
+    }
+    btn.classList.add('armed'); label.textContent = 'Click again to clear';
+    resetTimer = setTimeout(() => { btn.classList.remove('armed'); label.textContent = 'Reset'; }, 3000);
+  });
+  window.addEventListener('focus', askSlots);
+  window.orca.onMessage(m => {
+    if (!alive() || !m || typeof m !== 'object') return;
+    // Only the copy that asked for a reset takes the page, and only after Orca's dispatch loop has
+    // finished (the fresh copy registers its own handler while that loop is still running).
+    if (m.cmd === 'page') { if (resetAsked && typeof m.html === 'string' && m.html.length > 1000) { resetAsked = false; setTimeout(() => resetPage(m.html), 0); } return; }
+    if (m.cmd === 'slots' && Array.isArray(m.slots)) {
+      // preset names end in "@Printer"; the slot list only needs the filament part
+      S.orcaSlots = m.slots.length ? m.slots.map(x => ({ name: String(x.name || '').replace(/\s*@[^@]*$/, '') || String(x.name || ''), color: String(x.color || '#888888').slice(0, 7) })) : null;
+      S.plateCount = m.plate | 0;
+      $('orcaHint').hidden = !S.plateCount;
+      renderSlots();
+    } else if (m.cmd === 'sent') {
+      $('sendOrca').disabled = !S.tray;
+      status(m.message || (m.ok ? 'Sent to the plate' : 'Could not send to Orca'));
+      if (m.ok) {
+        $('sendNote').textContent = 'sent ✓';
+        setTimeout(() => { $('sendNote').textContent = 'one object, parts on their slots'; if ($('status').textContent === m.message) status(''); }, 4000);
+        askSlots();
+      }
+    }
+  });
+  const b64 = bytes => { let out = ''; for (let i = 0; i < bytes.length; i += 0x8000) out += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(out); };
+  $('sendOrca').addEventListener('click', async () => {
+    if (!S.tray) return;
+    $('sendOrca').disabled = true; status('Sending to Orca…');
+    try { window.orca.postMessage({ cmd: 'send', name: fileBase(), b64: b64(await orcaFile()) }); }
+    catch (e) { $('sendOrca').disabled = false; status('Could not send: ' + (e.message || e)); }
+  });
+  $('fileName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('sendOrca').click(); } });
+  // the bridge can drop messages sent while the panel is still starting, so ask until Orca answers
+  askSlots(); [800, 2500, 6000].forEach(t => setTimeout(() => { if (!S.orcaSlots) askSlots(); }, t));
+}
+$('dlZip').addEventListener('click', () => {
+  const parts = exportParts();
+  const files = parts.map((p, i) => ({ name: `${String(i).padStart(2, '0')}-${slug(p.name)}.stl`, data: C.stlBinary([p.mesh]) }));
+  files.push({ name: fileBase() + '.3mf', data: C.threeMF(parts) });
+  save(fileBase() + '_parts.zip', C.zip(files));
+});
+})();
+</script>
+</body>
+</html>
