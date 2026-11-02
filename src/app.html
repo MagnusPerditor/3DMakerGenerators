@@ -844,6 +844,40 @@ function colorName(hex) {
 }
 
 // ---------- 1. load ----------
+// After a smooth enlargement, edge pixels are blends of two colors, which would show up as extra
+// halo colors. Give each pixel the closest of the original pixels around it instead: the color
+// boundaries keep the smooth curve of the enlargement but every pixel is a real art color.
+function unblend(big, im) {
+  const w0 = im.naturalWidth, h0 = im.naturalHeight, c0 = document.createElement('canvas');
+  c0.width = w0; c0.height = h0; const x0 = c0.getContext('2d'); x0.drawImage(im, 0, 0);
+  const src = x0.getImageData(0, 0, w0, h0).data, d = big.data;
+  // palette: colors of "solid" source pixels (inside a flat patch); anti-aliased edge pixels are not solid
+  const near = (a, b) => Math.abs(src[a] - src[b]) + Math.abs(src[a + 1] - src[b + 1]) + Math.abs(src[a + 2] - src[b + 2]) < 24;
+  const counts = new Map(); let total = 0;
+  for (let y = 1; y < h0 - 1; y++) for (let x = 1; x < w0 - 1; x++) {
+    const j = (y * w0 + x) * 4; if (src[j + 3] < 250) continue;
+    if (![[1, 0], [-1, 0], [0, 1], [0, -1]].every(([u, v]) => { const k = ((y + v) * w0 + x + u) * 4; return src[k + 3] >= 250 && near(j, k); })) continue;
+    const key = (src[j] >> 3) << 10 | (src[j + 1] >> 3) << 5 | (src[j + 2] >> 3);
+    const c = counts.get(key) || [0, 0, 0, 0]; c[0] += src[j]; c[1] += src[j + 1]; c[2] += src[j + 2]; c[3]++; counts.set(key, c); total++;
+  }
+  // merge near-identical shades (JPEG noise splits one ink into many) before dropping rare ones
+  const groups = [];
+  for (const c of [...counts.values()].sort((a, b) => b[3] - a[3])) {
+    const m = [c[0] / c[3], c[1] / c[3], c[2] / c[3]];
+    const g = groups.find(g => (g.c[0] / g.n - m[0]) ** 2 + (g.c[1] / g.n - m[1]) ** 2 + (g.c[2] / g.n - m[2]) ** 2 < 900);
+    if (g) { g.c[0] += c[0]; g.c[1] += c[1]; g.c[2] += c[2]; g.n += c[3]; } else groups.push({ c: [c[0], c[1], c[2]], n: c[3] });
+  }
+  const pal = groups.filter(g => g.n >= Math.max(3, total * 0.0005)).map(g => [g.c[0] / g.n, g.c[1] / g.n, g.c[2] / g.n]);
+  if (!pal.length) return big;
+  // every enlarged pixel takes the closest palette color: the borders follow the smooth enlargement
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] < 128) continue; // background stays as it is
+    let best = 0, bd = Infinity;
+    for (let p = 0; p < pal.length; p++) { const q = pal[p], dd = (q[0] - d[i]) ** 2 + (q[1] - d[i + 1]) ** 2 + (q[2] - d[i + 2]) ** 2; if (dd < bd) { bd = dd; best = p; } }
+    d[i] = pal[best][0]; d[i + 1] = pal[best][1]; d[i + 2] = pal[best][2]; d[i + 3] = 255;
+  }
+  return big;
+}
 function loadFile(file) {
   if (!file || !file.type.startsWith('image/')) { setErr('That file is not an image. Choose a PNG, JPG or SVG.'); return; }
   const isSvg = file.type === 'image/svg+xml' || /\.svg$/i.test(file.name || '');
@@ -853,11 +887,14 @@ function loadFile(file) {
   const im = new Image();
   let url;
   im.onload = () => {
-    const max = 1600, sc = Math.min(1, max / Math.max(im.naturalWidth, im.naturalHeight));
+    // tiny images (logos, emoji-sized art, under 400 px) are enlarged with smoothing first, so the model
+    // gets smooth edges instead of the original pixel staircase; large ones are capped at 1600 px
+    const long = Math.max(im.naturalWidth, im.naturalHeight), sc = long < 400 ? 1000 / long : Math.min(1, 1600 / long);
     const cv = document.createElement('canvas');
     cv.width = Math.round(im.naturalWidth * sc); cv.height = Math.round(im.naturalHeight * sc);
-    const cx = cv.getContext('2d'); cx.drawImage(im, 0, 0, cv.width, cv.height);
+    const cx = cv.getContext('2d'); cx.imageSmoothingEnabled = true; cx.imageSmoothingQuality = 'high'; cx.drawImage(im, 0, 0, cv.width, cv.height);
     S.img = cx.getImageData(0, 0, cv.width, cv.height);
+    if (sc > 1.01) S.img = unblend(S.img, im);
     URL.revokeObjectURL(url);
     S.regions = []; S.rimCustom = freshRimCustom(); S.textC.touched = false; clearHistory();
     runBackground();

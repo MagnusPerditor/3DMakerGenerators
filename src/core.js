@@ -48,14 +48,15 @@
     }
     const mask = new Uint8Array(N);
     for (let i = 0; i < N; i++) mask[i] = bg[i] ? 0 : 1;
-    // keep only the largest connected subject blob plus anything it encloses
-    keepLargestComponent(mask, w, h);
+    // keep every real piece of the subject (separate letters, a name below a character...) and drop
+    // only stray specks: blobs under 1% of the largest one
+    keepMainComponents(mask, w, h, 0.01);
     return { mask, bgColor: hex(br, bgc, bb) };
   }
 
-  function keepLargestComponent(mask, w, h) {
-    const N = w * h, comp = new Int32Array(N).fill(-1), stack = new Int32Array(N);
-    let best = -1, bestSize = 0, id = 0;
+  function keepMainComponents(mask, w, h, minFrac) {
+    const N = w * h, comp = new Int32Array(N).fill(-1), stack = new Int32Array(N), sizes = [];
+    let bestSize = 0, id = 0;
     for (let s = 0; s < N; s++) {
       if (!mask[s] || comp[s] >= 0) continue;
       let sp = 0, size = 0; stack[sp++] = s; comp[s] = id;
@@ -65,10 +66,11 @@
         const nb = [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, y > 0 ? i - w : -1, y < h - 1 ? i + w : -1];
         for (const j of nb) if (j >= 0 && mask[j] && comp[j] < 0) { comp[j] = id; stack[sp++] = j; }
       }
-      if (size > bestSize) { bestSize = size; best = id; }
+      sizes.push(size); if (size > bestSize) bestSize = size;
       id++;
     }
-    for (let i = 0; i < N; i++) if (mask[i] && comp[i] !== best) mask[i] = 0;
+    const min = Math.max(1, bestSize * minFrac);
+    for (let i = 0; i < N; i++) if (mask[i] && sizes[comp[i]] < min) mask[i] = 0;
   }
 
   // Crop image+mask to the subject's bounding box, resampled so the long side <= maxSide.
