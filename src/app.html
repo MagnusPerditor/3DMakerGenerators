@@ -997,7 +997,10 @@ async function runColors(resetRegions) {
     }
     labels = C.modeFilter(labels, p.width, p.height, kk, 2);
     const mmPerPx = artMmPerPx();
-    labels = C.mergeSmall(labels, p.width, p.height, kk, Math.max(1, Math.round(+$('speck').value / (mmPerPx * mmPerPx))));
+    // the speck size is in mm², but on small prints that would swallow real details (eyes, claws) that the
+    // minimum line width can widen instead, so never treat more than ~0.005% of the picture as a speck
+    const speckPx = Math.min(Math.round(+$('speck').value / (mmPerPx * mmPerPx)), Math.max(8, Math.round(p.width * p.height * 0.00005)));
+    labels = C.mergeSmall(labels, p.width, p.height, kk, Math.max(1, speckPx));
     p.labels = labels;
     const stats = C.regionStats(p, labels, kk);
     const old = S.regions;
