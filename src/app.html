@@ -294,6 +294,7 @@ input[type=color]:not([data-native]) { cursor: pointer; }
       <button type="button" role="tab" id="genBook" aria-selected="false"><b>Bookmark</b><small>Flat, tassel hole</small></button>
       <button type="button" role="tab" id="genCookie" aria-selected="false"><b>Cookie cutter</b><small>Cutter + stamp</small></button>
       <button type="button" role="tab" id="genFlat" aria-selected="false"><b>Flat model</b><small>Just the art, face down</small></button>
+      <button type="button" role="tab" id="genDust" aria-selected="false"><b>Dust cover</b><small>Joystick disc, face down</small></button>
     </div>
     <p class="extlink"><a href="https://quikclicks.app/" target="_blank" rel="noopener noreferrer">Clicker maker <span aria-hidden="true">↗</span><span class="sr">(opens QuikClicks in a new tab)</span></a><a href="https://app.printhq.io/" target="_blank" rel="noopener noreferrer">PrintHQ Vault <span aria-hidden="true">↗</span><span class="sr">(opens in a new tab)</span></a></p>
 
@@ -549,18 +550,25 @@ input[type=color]:not([data-native]) { cursor: pointer; }
       </div>
       </div>
       </div>
+      <div id="kDustSec" hidden>
+      <div class="field" id="dHoleField">
+        <label for="dHole">Center hole diameter</label><span class="num"><input type="number" id="dHoleNum" min="3" max="25" step="0.1" value="9" inputmode="decimal" aria-label="Center hole diameter"><span>mm</span></span>
+        <input type="range" id="dHole" min="3" max="25" step="0.1" value="9">
+      </div>
+      <p class="hint">For arcade sticks the disc sits under the panel and moves with the shaft. Size is the outside diameter. The art fills the ring around the hole; anything under the hole is cut away.</p>
+      </div>
       <div id="kShapeSec">
       <div class="sub-h" style="margin-top:4px">Shape</div>
       <div class="shapes" role="radiogroup" aria-label="Shape"><input type="radio" name="kShape" id="ksOutline" value="outline" checked><label for="ksOutline"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5c2.4 0 4 1.8 4 4 0 1.1-.4 2.1-1.1 2.8 2.1.9 3.6 2.9 3.6 5.4v3.8c0 .9-.7 1.5-1.5 1.5H7c-.8 0-1.5-.6-1.5-1.5v-3.8c0-2.5 1.5-4.5 3.6-5.4C8.4 8.6 8 7.6 8 6.5c0-2.2 1.6-4 4-4z"/></svg>Outline</label><input type="radio" name="kShape" id="ksCircle" value="circle"><label for="ksCircle"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/></svg>Circle</label><input type="radio" name="kShape" id="ksSquare" value="square"><label for="ksSquare"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="2.5" y="2.5" width="19" height="19" rx="4.5"/></svg>Square</label><input type="radio" name="kShape" id="ksStar" value="star"><label for="ksStar"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="12.0,3.0 9.3,9.3 2.5,9.9 7.6,14.4 6.1,21.1 12.0,17.6 17.9,21.1 16.4,14.4 21.5,9.9 14.7,9.3" stroke-linejoin="round" stroke-width="1.6" stroke="currentColor"/></svg>Star</label><input type="radio" name="kShape" id="ksCloud" value="cloud"><label for="ksCloud"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.5 19.5h11.2a4.3 4.3 0 0 0 .9-8.5 6.3 6.3 0 0 0-12.1-1.2A4.9 4.9 0 0 0 6.5 19.5z"/></svg>Cloud</label><input type="radio" name="kShape" id="ksHexagon" value="hexagon"><label for="ksHexagon"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="22,12 17,20.7 7,20.7 2,12 7,3.3 17,3.3" stroke-linejoin="round" stroke-width="1.4" stroke="currentColor"/></svg>Hexagon</label></div>
       <p class="hint" id="kShapeHint">Follows the outline of the art with a small border.</p>
       </div>
       <div class="field" id="kSizeField">
-        <label for="kSize">Size (longest side)</label><span class="num"><input type="number" id="kSizeNum" min="15" max="250" step="0.5" value="50" inputmode="decimal" aria-label="Size (longest side)"><span>mm</span></span>
-        <input type="range" id="kSize" min="15" max="250" step="0.5" value="50">
+        <label for="kSize">Size (longest side)</label><span class="num"><input type="number" id="kSizeNum" min="15" max="250" step="0.1" value="50" inputmode="decimal" aria-label="Size (longest side)"><span>mm</span></span>
+        <input type="range" id="kSize" min="15" max="250" step="0.1" value="50">
       </div>
       <div class="field" id="kThickField">
-        <label for="kThick">Thickness</label><span class="num"><input type="number" id="kThickNum" min="1.5" max="10" step="0.1" value="3.5" inputmode="decimal" aria-label="Thickness"><span>mm</span></span>
-        <input type="range" id="kThick" min="1.5" max="10" step="0.1" value="3.5">
+        <label for="kThick">Thickness</label><span class="num"><input type="number" id="kThickNum" min="0.6" max="10" step="0.1" value="3.5" inputmode="decimal" aria-label="Thickness"><span>mm</span></span>
+        <input type="range" id="kThick" min="0.6" max="10" step="0.1" value="3.5">
       </div>
       <div class="field" id="kDepthField">
         <label for="kDepth">Color depth</label><span class="num"><input type="number" id="kDepthNum" min="0.2" max="10" step="0.1" value="1" inputmode="decimal" aria-label="Color depth"><span>mm</span></span>
@@ -1107,10 +1115,10 @@ function renderTally() {
 $('baseColor').addEventListener('input', () => { S.baseSpool = S.pickedSpool || null; $('baseSpool').textContent = S.baseSpool ? '· ' + spoolLabel(S.baseSpool) : ''; refreshSwatches(); drawPreview(); scheduleBuild(); });
 
 // ---------- rim / border wall filament (may be a filament no art region uses) ----------
-const freshRimCustom = () => ({ tray: null, coin: null, keychain: null, magnet: null, coaster: null, bookmark: null, cookie: null, flat: null, coasterRim: null, filler: null });
+const freshRimCustom = () => ({ tray: null, coin: null, keychain: null, magnet: null, coaster: null, bookmark: null, cookie: null, flat: null, dust: null, coasterRim: null, filler: null });
 S.rimCustom = freshRimCustom();
 // one filament slot per rim-like part; keychain, magnet and coaster share the surround/face selector
-const RIM_SEL = { tray: 'rimStyle', coin: 'cRimFil', keychain: 'kRimFil', magnet: 'kRimFil', coaster: 'kRimFil', bookmark: 'kRimFil', cookie: 'kRimFil', flat: 'kRimFil', coasterRim: 'qRimFil', filler: 'fFil' };
+const RIM_SEL = { tray: 'rimStyle', coin: 'cRimFil', keychain: 'kRimFil', magnet: 'kRimFil', coaster: 'kRimFil', bookmark: 'kRimFil', cookie: 'kRimFil', flat: 'kRimFil', dust: 'kRimFil', coasterRim: 'qRimFil', filler: 'fFil' };
 function rimCustomLabel(g) { const c = S.rimCustom[g]; return c.spool ? spoolLabel(c.spool) : 'Custom ' + colorName(c.color).toLowerCase(); }
 const rimSelect = () => $(RIM_SEL[S.gen]);
 function rimFill(g) {
@@ -1289,6 +1297,7 @@ async function build() {
       const res = C.buildKeychain(bprep, {
         shape: kcShape(), sizeMM: g === 'bookmark' ? Math.max(+$('bLen').value, +$('bWid').value) : +$('kSize').value,
         rectWMM: +$('bWid').value, rectHMM: +$('bLen').value, cornerMM: +$('bCorner').value,
+        centerHole: g === 'dust' ? { diaMM: +$('dHole').value } : null,
         tassel: g === 'bookmark' && $('bTassel').checked ? { diaMM: +$('bHole').value, fromEdgeMM: +$('bHoleY').value } : null,
         thicknessMM: +$('kThick').value, colorDepthMM: +$('kDepth').value,
         marginMM: +$('kMargin').value, fillGapsMM: +$('kGaps').value, artScale: +$('kScale').value / 100, offsetXMM: +$('kOffX').value, offsetYMM: +$('kOffY').value,
@@ -1377,10 +1386,12 @@ const GEN = {
   cookie: { title: 'Cookie cutter', suffix: '_cookie_cutter', imgH: 1, smooth: 0.2 },
   bookmark: { title: 'Bookmark', suffix: '_bookmark', imgH: 1, smooth: 0.15,
     flat: { kSize: 150, kThick: 1.6, kDepth: 1, kMargin: 3, kGaps: 4, kScale: 100, kOffX: 0, kOffY: 0, shape: 'rect', kRimFil: '-1', faceDown: true } },
+  dust: { title: 'Dust cover', suffix: '_dust_cover', imgH: 1, smooth: 0.12,
+    flat: { kSize: 41.5, kThick: 1, kDepth: 0.6, kMargin: 1, kGaps: 4, kScale: 100, kOffX: 0, kOffY: 0, shape: 'circle', kRimFil: '-1', faceDown: true } },
 };
-const GEN_NAME = { tray: 'Trinket tray', coin: 'Coin & token', keychain: 'Keychain', magnet: 'Magnet', coaster: 'Coaster', bookmark: 'Bookmark', cookie: 'Cookie cutter', flat: 'Flat model' };
-const GEN_BTN = { tray: 'genTray', coin: 'genCoin', keychain: 'genKey', magnet: 'genMag', coaster: 'genCoast', bookmark: 'genBook', cookie: 'genCookie', flat: 'genFlat' };
-const FLAT = new Set(['keychain', 'magnet', 'coaster', 'bookmark', 'flat']); // share the flat-model panel
+const GEN_NAME = { tray: 'Trinket tray', coin: 'Coin & token', keychain: 'Keychain', magnet: 'Magnet', coaster: 'Coaster', bookmark: 'Bookmark', cookie: 'Cookie cutter', flat: 'Flat model', dust: 'Dust cover' };
+const GEN_BTN = { tray: 'genTray', coin: 'genCoin', keychain: 'genKey', magnet: 'genMag', coaster: 'genCoast', bookmark: 'genBook', cookie: 'genCookie', flat: 'genFlat', dust: 'genDust' };
+const FLAT = new Set(['keychain', 'magnet', 'coaster', 'bookmark', 'flat', 'dust']); // share the flat-model panel
 const FLAT_IDS = ['kSize', 'kThick', 'kDepth', 'kMargin', 'kGaps', 'kScale', 'kOffX', 'kOffY'];
 function saveFlat(g) { const v = GEN[g].flat; FLAT_IDS.forEach(id => v[id] = +$(id).value); if (g !== 'bookmark') v.shape = kcShape(); v.kRimFil = $('kRimFil').value; v.faceDown = $('kFaceDown').checked; }
 function loadFlat(g) {
@@ -1399,6 +1410,7 @@ function syncKcShape() {
   $('kHoleFields').hidden = $('kHolePos').value === 'none';
   $('kRingSec').hidden = g !== 'keychain'; $('kMagSec').hidden = g !== 'magnet'; $('kCoastSec').hidden = g !== 'coaster';
   $('kFaceDownRow').hidden = g === 'coaster'; // the coaster rim stands above the face
+  $('kDustSec').hidden = g !== 'dust'; $('kSizeField').querySelector('label').textContent = g === 'dust' ? 'Outside diameter' : 'Size (longest side)';
   const bm = g === 'bookmark'; $('kBookSec').hidden = !bm; $('kShapeSec').hidden = bm; $('kSizeField').hidden = bm;
   $('bTasselFields').hidden = !$('bTassel').checked;
   $('kRimFilLbl').textContent = g === 'coaster' ? 'Face filament' : 'Surround filament';
@@ -1448,6 +1460,7 @@ $('genCoast').addEventListener('click', () => setGen('coaster'));
 $('genBook').addEventListener('click', () => setGen('bookmark'));
 $('genCookie').addEventListener('click', () => setGen('cookie'));
 $('genFlat').addEventListener('click', () => setGen('flat'));
+$('genDust').addEventListener('click', () => setGen('dust'));
 $('kFaceDown').addEventListener('change', () => { if (S.tray) { status(''); recordState(); magnetHint(); } });
 ['ckSize', 'ckH', 'ckWall', 'ckBlade', 'ckLip', 'ckLipH', 'ckGaps', 'ckBoost', 'ckRel', 'ckST', 'ckClr'].forEach(id => $(id).addEventListener('input', scheduleBuild));
 $('ckStamp').addEventListener('change', () => { $('ckStampFields').hidden = !$('ckStamp').checked; scheduleBuild(); });
@@ -1469,7 +1482,7 @@ function fillOn() { return FLAT.has(S.gen) && $('fOn').checked; }
 ['fShape', 'fFil'].forEach(id => $(id).addEventListener('change', () => { renderTally(); scheduleBuild(); }));
 $('fOn').addEventListener('change', () => { $('fFields').hidden = !$('fOn').checked; renderTally(); scheduleBuild(); });
 $('fShuffle').addEventListener('click', () => { $('fSeed').value = String(1 + Math.floor(Math.random() * 1e9)); scheduleBuild(); });
-['bLen', 'bWid', 'bCorner', 'bHole', 'bHoleY'].forEach(id => $(id).addEventListener('input', scheduleBuild));
+['bLen', 'bWid', 'bCorner', 'bHole', 'bHoleY', 'dHole'].forEach(id => $(id).addEventListener('input', scheduleBuild));
 $('bTassel').addEventListener('change', () => { syncKcShape(); scheduleBuild(); });
 ['mDia', 'mThick', 'mClr', 'qRimW', 'qRimH', 'qPadD', 'qPadIn'].forEach(id => $(id).addEventListener('input', scheduleBuild));
 ['mCount', 'mStyle', 'qRimFil', 'qPad'].forEach(id => $(id).addEventListener('change', () => { syncKcShape(); renderTally(); scheduleBuild(); }));

@@ -6,7 +6,7 @@ Unicode true
 !define APPNAME   "3D Maker Generators"
 !define EXENAME   "MakerGenerators.exe"
 !define COMPANY   "Geletka Tech"
-!define VERSION   "1.7.3"
+!define VERSION   "1.8.0"
 !define UNINSTKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\MakerGenerators"
 !define WV2GUID   "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
 

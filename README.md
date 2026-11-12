@@ -14,6 +14,7 @@ Turn flat character art into multicolor, 3D-printable models: one part per color
 | Bookmark | Rounded rectangle with a tassel hole, printed face down |
 | Cookie cutter | A cutter that follows the art's outline, plus a matching mirrored stamp |
 | Flat model | Just the art as a flat piece, printed face down |
+| Dust cover | Joystick dust-cover disc (41.5 mm, 9 mm center hole, 1 mm thick by default), printed face down |
 
 Shared features: background removal, automatic color detection with merge/paint/select tools, SpoolmanDB filament matching, an optional text layer, filler shapes (stars, hearts, dots) for empty space, a minimum line width so thin outlines print cleanly, undo/redo, and face-down export.
 

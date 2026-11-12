@@ -724,6 +724,7 @@
   // Flat keychain: body + art colours all finish at one top height. Colours fill the top colorDepthMM.
   // opts: shape ('outline'|'circle'|'square'|'star'|'cloud'), sizeMM (longest side of the body), thicknessMM, colorDepthMM,
   //       marginMM (space around the art), fillGapsMM (outline only), artScale, offsetXMM, offsetYMM (shapes only),
+  //       centerHole {diaMM} (hole straight through the middle),
   //       holePos ('top'|'top-left'|'top-right'|'left'|'right'|'none'), holeDiaMM, ringWallMM, smoothMM,
   //       layerOf[label] -> layer id | -1, layers [{id}], marginLayer (id | -1: surround prints in the base filament)
   function buildKeychain(prep, opts, triangulate) {
@@ -764,6 +765,14 @@
       const dIn = edt(inv, W, H), need = m / res;
       const fit = fitArtInShape(prep, (X, Y) => { const gx = Math.round(X / res + cx), gy = Math.round(cy - Y / res); return gx >= 0 && gy >= 0 && gx < W && gy < H && dIn[gy * W + gx] >= need; }, bw, bh);
       kArt = Math.max(1e-3, fit.k) * (opts.artScale || 1); artCX = fit.x + (opts.offsetXMM || 0); artCY = fit.y + (opts.offsetYMM || 0);
+    }
+    // centre hole punched straight through (joystick dust covers); cut after fitting so the art still fills
+    // the whole shape and simply has the hole through it, with the margin kept clear around the hole too
+    if (opts.centerHole && opts.centerHole.diaMM > 0) {
+      const rp = opts.centerHole.diaMM / 2 / res;
+      for (let y = Math.max(0, Math.floor(cy - rp - 1)); y <= Math.min(H - 1, Math.ceil(cy + rp + 1)); y++)
+        for (let x = Math.max(0, Math.floor(cx - rp - 1)); x <= Math.min(W - 1, Math.ceil(cx + rp + 1)); x++)
+          if (Math.hypot(x - cx, y - cy) <= rp) body[y * W + x] = 0;
     }
     // art labels, kept a little inside the edge
     const inv2 = new Uint8Array(N); for (let i = 0; i < N; i++) inv2[i] = body[i] ? 0 : 1;
