@@ -5,7 +5,7 @@
 # name = "3D Maker Generators"
 # description = "Turn character art into multicolor trays, coins, keychains, magnets, coasters, bookmarks, cookie cutters and flat models, then send them to the plate with every part already on its filament slot."
 # author = "G-Tech3D"
-# version = "1.9.0"
+# version = "1.9.1"
 # ///
 """3D Maker Generators for OrcaSlicer.
 

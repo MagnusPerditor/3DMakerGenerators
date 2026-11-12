@@ -795,7 +795,10 @@
       for (const L of labs) {
         const M = new Uint8Array(N); for (let i = 0; i < N; i++) M[i] = lab[i] === L ? 1 : 0;
         const opened = dilateMask(erodeMask(M, W, H, r), W, H, r + 0.5), thin = new Uint8Array(N); let any = 0;
-        for (let i = 0; i < N; i++) if (M[i] && !opened[i]) { thin[i] = 1; any++; }
+        // an opening also shaves the corners and square ends off wide shapes (letters especially); those
+        // slivers hug the opened shape, while a real thin line runs well away from it, so skip the slivers
+        const dOpen = edt(opened, W, H), sliver = 0.5 * r + 1; // distance to the nearest kept (wide) pixel
+        for (let i = 0; i < N; i++) if (M[i] && !opened[i] && dOpen[i] > sliver) { thin[i] = 1; any++; }
         if (any < 3) continue;
         // half-width of each thin pixel's stroke, then grow just enough to reach the minimum
         const inv = new Uint8Array(N); for (let i = 0; i < N; i++) inv[i] = M[i] ? 0 : 1;
