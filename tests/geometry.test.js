@@ -59,3 +59,29 @@ const files = C.orca3MFFiles(cookie.parts.map((p, i) => ({ name: 'Part ' + i, ex
 const cfg = new TextDecoder().decode(files.find(f => f.name === 'Metadata/model_settings.config').data);
 cookie.parts.forEach((p, i) => assert(cfg.includes(`<metadata key="name" value="Part ${i}"/>\n      <metadata key="extruder" value="${i + 1}"/>`), 'slot missing for part ' + i));
 console.log('ok orca 3mf slots');
+
+// Paint a model: the art painted onto a cylinder, written as Orca paint strings. Decode each string the way
+// Orca's TriangleSelector::deserialize reads it and check every tree is complete and only uses known states.
+{
+  const n = 48, P = [0, 0, 0, 0, 0, 30], I = [];
+  for (let i = 0; i < n; i++) { const a = i / n * 2 * Math.PI; P.push(15 * Math.cos(a), 15 * Math.sin(a), 0, 15 * Math.cos(a), 15 * Math.sin(a), 30); }
+  for (let i = 0; i < n; i++) { const j = (i + 1) % n, b0 = 2 + 2 * i, t0 = 3 + 2 * i, b1 = 2 + 2 * j, t1 = 3 + 2 * j; I.push(0, b1, b0, 1, t0, t1, b0, b1, t1, b0, t1, t0); }
+  const mesh = { positions: new Float32Array(P), indices: new Uint32Array(I) };
+  const r = C.paintMesh(mesh, { art: prep, stateOf: prep.labels ? st.map((_, i) => i + 1) : [], mmPerPx: 40 / prep.width, kind: 'wrap', axis: [0, 0], radius: 15, zc: 15, minEdge: 0.3 });
+  assert(r.painted > 0, 'paint: nothing painted');
+  const strings = C.paintStrings(r.trees, st.map((_, i) => i + 2).concat([0]).reduce((a, v, i) => (a[i + 1] = v, a), [0]));
+  for (const s of strings) {
+    if (!s) continue;
+    const bits = []; for (let k = s.length - 1; k >= 0; k--) { const d = parseInt(s[k], 16); for (let b = 0; b < 4; b++) bits.push((d >> b) & 1); }
+    let p = 0; const nib = () => { const v = bits[p] | bits[p + 1] << 1 | bits[p + 2] << 2 | bits[p + 3] << 3; p += 4; return v; };
+    const walk = () => {
+      const code = nib(), sides = code & 3;
+      if (sides === 0) { if ((code & 12) === 12) { const st2 = nib() + 3; assert(st2 <= 17, 'paint: bad state'); } return; }
+      assert(sides === 3 || (code >> 2) !== 3, 'paint: bad split code');
+      for (let c = 0; c <= sides; c++) walk();
+    };
+    walk();
+    assert(p === bits.length, 'paint: string has leftover bits');
+  }
+  console.log('ok paint', r.painted, 'triangles painted');
+}

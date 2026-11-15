@@ -1134,7 +1134,8 @@
     parts.forEach((p, i) => {
       const P = p.mesh.positions, I = p.mesh.indices, v = [], t = [];
       for (let j = 0; j < P.length; j += 3) v.push(`<vertex x="${+P[j].toFixed(4)}" y="${+P[j + 1].toFixed(4)}" z="${+P[j + 2].toFixed(4)}"/>`);
-      for (let j = 0; j < I.length; j += 3) t.push(`<triangle v1="${I[j]}" v2="${I[j + 1]}" v3="${I[j + 2]}"/>`);
+      const pc = p.paint; // optional Orca multi-material paint, one string per triangle
+      for (let j = 0; j < I.length; j += 3) t.push(pc && pc[j / 3] ? `<triangle v1="${I[j]}" v2="${I[j + 1]}" v3="${I[j + 2]}" paint_color="${pc[j / 3]}"/>` : `<triangle v1="${I[j]}" v2="${I[j + 1]}" v3="${I[j + 2]}"/>`);
       chunks.push(`<object id="${i + 1}" name="${esc(p.name)}" type="model">\n<mesh>\n<vertices>\n${v.join('\n')}\n</vertices>\n<triangles>\n${t.join('\n')}\n</triangles>\n</mesh>\n</object>\n`);
     });
     chunks.push(`<object id="${parent}" name="${esc(objectName)}" type="model">\n<components>\n${parts.map((_, i) => `<component objectid="${i + 1}"/>`).join('\n')}\n</components>\n</object>\n</resources>\n<build>\n<item objectid="${parent}"/>\n</build>\n</model>\n`);
@@ -1196,6 +1197,273 @@
     return Int32Array.from(out);
   }
 
-  const api = { amfXML, orca3MF, orca3MFFiles, buildCookie, buildKeychain, buildCoin, artRadiusPx, simplifyClusters, componentAt, removeBackground, cropAndScale, kmeans, modeFilter, mergeSmall, regionStats, buildTray, stlBinary, threeMF, zip, hex, _ms: marchingSquares, _shapes: loopsToShapes, _edt: edt };
+  // ---------- 9. painting an existing model (STL / 3MF) ----------
+  // The model's shape is left alone; the image is projected onto it and written as Orca/Bambu
+  // multi-material paint (the same per-triangle data the paint brush makes), so it slices like hand painting.
+
+  // read the entries of a zip (3MF); inflate(bytes) -> Promise<Uint8Array> handles deflated ones
+  async function unzip(u8, inflate) {
+    const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength), dec = new TextDecoder(), out = {};
+    let e = u8.length - 22; while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
+    if (e < 0) throw new Error('not a zip file');
+    const count = dv.getUint16(e + 10, true); let p = dv.getUint32(e + 16, true);
+    for (let i = 0; i < count; i++) {
+      const method = dv.getUint16(p + 10, true), csz = dv.getUint32(p + 20, true), nl = dv.getUint16(p + 28, true),
+        xl = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), lo = dv.getUint32(p + 42, true);
+      const name = dec.decode(u8.subarray(p + 46, p + 46 + nl)); p += 46 + nl + xl + cl;
+      const start = lo + 30 + dv.getUint16(lo + 26, true) + dv.getUint16(lo + 28, true), body = u8.subarray(start, start + csz);
+      out[name.replace(/^\//, '')] = method === 0 ? body : method === 8 ? await inflate(body) : null;
+    }
+    return out;
+  }
+  // weld identical vertices so the painted model stays one closed mesh
+  function weld(pos, idx) {
+    const map = new Map(), P = [], I = new Uint32Array(idx.length), r = v => Math.round(v * 1e4);
+    for (let t = 0; t < idx.length; t++) {
+      const j = idx[t] * 3, k = r(pos[j]) + ',' + r(pos[j + 1]) + ',' + r(pos[j + 2]);
+      let n = map.get(k); if (n === undefined) { n = P.length / 3; map.set(k, n); P.push(pos[j], pos[j + 1], pos[j + 2]); }
+      I[t] = n;
+    }
+    // drop triangles that collapsed to a line or point
+    const keep = []; for (let t = 0; t < I.length; t += 3) if (I[t] !== I[t + 1] && I[t + 1] !== I[t + 2] && I[t] !== I[t + 2]) keep.push(I[t], I[t + 1], I[t + 2]);
+    return { positions: new Float32Array(P), indices: Uint32Array.from(keep) };
+  }
+  function parseSTL(u8) {
+    const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+    const n = u8.length >= 84 ? dv.getUint32(80, true) : 0, pos = [];
+    if (u8.length >= 84 && 84 + n * 50 === u8.length) {
+      for (let t = 0; t < n; t++) { const o = 84 + t * 50 + 12; for (let k = 0; k < 9; k++) pos.push(dv.getFloat32(o + k * 4, true)); }
+    } else {
+      const s = new TextDecoder().decode(u8), re = /vertex\s+([-+\d.eE]+)\s+([-+\d.eE]+)\s+([-+\d.eE]+)/g; let m;
+      while ((m = re.exec(s))) pos.push(+m[1], +m[2], +m[3]);
+      if (!pos.length) throw new Error('no triangles found in this STL');
+    }
+    return weld(pos, Uint32Array.from({ length: pos.length / 3 }, (_, i) => i));
+  }
+  // 3MF: every build item (and the components it references, including Bambu/Orca sub-files) merged into one mesh
+  function parse3MFModels(files) {
+    const dec = new TextDecoder(), objs = new Map();
+    const attr = (s, a) => { const m = s.match(new RegExp('\\b' + a + '="([^"]*)"')); return m ? m[1] : null; };
+    const mat = t => { if (!t) return [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]; const v = t.trim().split(/\s+/).map(Number); return v.length === 12 ? v : [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]; };
+    const mul = (a, b) => [ // apply b then a (3MF row-vector 3x4 matrices)
+      b[0] * a[0] + b[1] * a[3] + b[2] * a[6], b[0] * a[1] + b[1] * a[4] + b[2] * a[7], b[0] * a[2] + b[1] * a[5] + b[2] * a[8],
+      b[3] * a[0] + b[4] * a[3] + b[5] * a[6], b[3] * a[1] + b[4] * a[4] + b[5] * a[7], b[3] * a[2] + b[4] * a[5] + b[5] * a[8],
+      b[6] * a[0] + b[7] * a[3] + b[8] * a[6], b[6] * a[1] + b[7] * a[4] + b[8] * a[7], b[6] * a[2] + b[7] * a[5] + b[8] * a[8],
+      b[9] * a[0] + b[10] * a[3] + b[11] * a[6] + a[9], b[9] * a[1] + b[10] * a[4] + b[11] * a[7] + a[10], b[9] * a[2] + b[10] * a[5] + b[11] * a[8] + a[11]];
+    let main = null;
+    for (const [name, data] of Object.entries(files)) {
+      if (!/\.model$/i.test(name) || !data) continue;
+      const s = dec.decode(data), path = '/' + name;
+      if (/^3D\/3dmodel\.model$/i.test(name)) main = { s, path };
+      const re = /<object\b([^>]*)>([\s\S]*?)<\/object>/g; let m;
+      while ((m = re.exec(s))) {
+        const id = attr(m[1], 'id'), body = m[2], o = { comps: [], pos: null, idx: null };
+        const mesh = body.match(/<mesh>([\s\S]*?)<\/mesh>/);
+        if (mesh) {
+          const P = [], I = []; let v;
+          const vr = /<vertex\b([^>]*)\/?>/g; while ((v = vr.exec(mesh[1]))) P.push(+attr(v[1], 'x'), +attr(v[1], 'y'), +attr(v[1], 'z'));
+          const tr = /<triangle\b([^>]*)\/?>/g; while ((v = tr.exec(mesh[1]))) I.push(+attr(v[1], 'v1'), +attr(v[1], 'v2'), +attr(v[1], 'v3'));
+          o.pos = P; o.idx = I;
+        }
+        const cr = /<component\b([^>]*)\/?>/g; let c;
+        while ((c = cr.exec(body))) o.comps.push({ id: attr(c[1], 'objectid'), path: attr(c[1], 'p:path') || path, t: mat(attr(c[1], 'transform')) });
+        objs.set(path + '#' + id, o);
+      }
+    }
+    if (!main) throw new Error('this 3MF has no 3D/3dmodel.model');
+    const P = [], I = [];
+    const emit = (key, T, depth) => {
+      const o = objs.get(key); if (!o || depth > 8) return;
+      if (o.pos) {
+        const base = P.length / 3;
+        for (let j = 0; j < o.pos.length; j += 3) { const x = o.pos[j], y = o.pos[j + 1], z = o.pos[j + 2]; P.push(x * T[0] + y * T[3] + z * T[6] + T[9], x * T[1] + y * T[4] + z * T[7] + T[10], x * T[2] + y * T[5] + z * T[8] + T[11]); }
+        for (const k of o.idx) I.push(k + base);
+      }
+      for (const c of o.comps) emit(c.path + '#' + c.id, mul(T, c.t), depth + 1);
+    };
+    const ir = /<item\b([^>]*)\/?>/g; let it;
+    while ((it = ir.exec(main.s))) emit(main.path + '#' + attr(it[1], 'objectid'), mat(attr(it[1], 'transform')), 0);
+    if (!I.length) throw new Error('no triangles found in this 3MF');
+    return weld(P, Uint32Array.from(I));
+  }
+  async function loadMesh(name, u8, inflate) {
+    const mesh = /\.3mf$/i.test(name) ? parse3MFModels(await unzip(u8, inflate)) : parseSTL(u8);
+    // sit it on the plate, centred
+    const P = mesh.positions, lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
+    for (let j = 0; j < P.length; j++) { const a = j % 3; if (P[j] < lo[a]) lo[a] = P[j]; if (P[j] > hi[a]) hi[a] = P[j]; }
+    const cx = (lo[0] + hi[0]) / 2, cy = (lo[1] + hi[1]) / 2;
+    for (let j = 0; j < P.length; j += 3) { P[j] -= cx; P[j + 1] -= cy; P[j + 2] -= lo[2]; }
+    mesh.size = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]];
+    return mesh;
+  }
+
+  // Orca's paint string for one source triangle: a tree of 4-way splits, leaves hold a state
+  // (0 = the object's own filament, n = filament n). Bits per TriangleSelector::serialize, children
+  // written 3..0, then 4-bit groups as hex digits in reverse order.
+  // trees: per triangle the split/leaf tokens from paintMesh (-1 = split in four, -2..-4 = split the side opposite
+  // corner 0..2 in two, k >= 0 = leaf with key k);
+  // stateOf[k] is the paint state (filament number, 0 = none) each key is written as
+  const HEX = '0123456789ABCDEF';
+  function paintStrings(trees, stateOf) {
+    return trees.map(tr => {
+      if (!tr) return '';
+      const nib = []; let any = false;
+      for (const k of tr) { if (k < 0) { nib.push(k === -1 ? 3 : 1 | ((-2 - k) << 2)); continue; } const st = k ? stateOf[k] || 0 : 0; if (st) any = true; if (st >= 3) nib.push(12, Math.min(14, st - 3)); else nib.push(st << 2); }
+      if (!any) return '';
+      let out = ''; for (let i = nib.length - 1; i >= 0; i--) out += HEX[nib[i]];
+      return out;
+    });
+  }
+
+  // projector: maps a point to image pixels (u right, v down), a depth (smaller = nearer the projector) and whether a
+  // surface normal faces it. kind 'flat' projects straight along dir; 'wrap' wraps round a vertical axis.
+  function makeProjector(o) {
+    const { width: W, height: H } = o.art, k = o.mmPerPx, cosLim = Math.cos((o.maxAngle || 70) * Math.PI / 180);
+    const rot = (o.rotation || 0) * Math.PI / 180, cr = Math.cos(rot), sr = Math.sin(rot);
+    const toPx = (a, b) => { // a,b in mm on the image plane (a right, b up), relative to the image centre
+      a -= o.offX || 0; b -= o.offY || 0; const x = a * cr + b * sr, y = -a * sr + b * cr;
+      return [x / k + W / 2, H / 2 - y / k];
+    };
+    if (o.kind === 'wrap') {
+      const [ax, ay] = o.axis || [0, 0], R = o.radius, t0 = (o.startDeg || 0) * Math.PI / 180;
+      // angle measured from the front (-Y) going round to the right (+X), so the art reads normally from the front
+      const ang = (x, y) => { let t = Math.atan2(x - ax, -(y - ay)) - t0; while (t > Math.PI) t -= 2 * Math.PI; while (t < -Math.PI) t += 2 * Math.PI; return t; };
+      return {
+        kind: 'wrap', W, H, seam: Math.PI * R,
+        plane: p => [ang(p[0], p[1]) * R, p[2] - (o.zc || 0)],
+        px: p => toPx(ang(p[0], p[1]) * R, p[2] - (o.zc || 0)),
+        depth: p => -Math.hypot(p[0] - ax, p[1] - ay),
+        faces: (p, n) => { const dx = p[0] - ax, dy = p[1] - ay, r = Math.hypot(dx, dy) || 1; return (n[0] * dx + n[1] * dy) / r >= cosLim; },
+      };
+    }
+    const d = o.dir, up0 = Math.abs(d[2]) > 0.9 ? [0, 1, 0] : [0, 0, 1];
+    // right = up x (-d) ... built so the image reads normally when looking along d
+    let rx = d[1] * up0[2] - d[2] * up0[1], ry = d[2] * up0[0] - d[0] * up0[2], rz = d[0] * up0[1] - d[1] * up0[0];
+    const rl = Math.hypot(rx, ry, rz); rx /= rl; ry /= rl; rz /= rl;
+    const ux = ry * d[2] - rz * d[1], uy = rz * d[0] - rx * d[2], uz = rx * d[1] - ry * d[0];
+    const c = o.center || [0, 0, 0];
+    const plane = p => { const x = p[0] - c[0], y = p[1] - c[1], z = p[2] - c[2]; return [x * rx + y * ry + z * rz, x * ux + y * uy + z * uz]; };
+    return {
+      kind: 'flat', W, H, right: [rx, ry, rz], up: [ux, uy, uz],
+      plane, px: p => { const q = plane(p); return toPx(q[0], q[1]); },
+      depth: p => p[0] * d[0] + p[1] * d[1] + p[2] * d[2],
+      faces: (p, n) => -(n[0] * d[0] + n[1] * d[1] + n[2] * d[2]) >= cosLim,
+    };
+  }
+
+  // nearest surface seen by the projector, on a grid over the image plane (mm), so hidden faces stay unpainted
+  function depthMap(mesh, pr, cell) {
+    const P = mesh.positions, I = mesh.indices, nv = P.length / 3, pl = new Float32Array(nv * 2), dp = new Float32Array(nv);
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    for (let v = 0; v < nv; v++) {
+      const p = [P[v * 3], P[v * 3 + 1], P[v * 3 + 2]], q = pr.plane(p); pl[v * 2] = q[0]; pl[v * 2 + 1] = q[1]; dp[v] = pr.depth(p);
+      if (q[0] < x0) x0 = q[0]; if (q[0] > x1) x1 = q[0]; if (q[1] < y0) y0 = q[1]; if (q[1] > y1) y1 = q[1];
+    }
+    x0 -= cell; y0 -= cell; x1 += cell; y1 += cell;
+    const GW = Math.min(4000, Math.ceil((x1 - x0) / cell) + 1), GH = Math.min(4000, Math.ceil((y1 - y0) / cell) + 1);
+    const cx = (x1 - x0) / (GW - 1), cy = (y1 - y0) / (GH - 1), D = new Float32Array(GW * GH).fill(Infinity);
+    const span = pr.kind === 'wrap' ? Math.PI * 1.5 * Math.abs(x1 - x0) / (2 * Math.PI) : Infinity;
+    for (let t = 0; t < I.length; t += 3) {
+      const a = I[t], b = I[t + 1], c = I[t + 2];
+      const ax = (pl[a * 2] - x0) / cx, ay = (pl[a * 2 + 1] - y0) / cy, bx = (pl[b * 2] - x0) / cx, by = (pl[b * 2 + 1] - y0) / cy, qx = (pl[c * 2] - x0) / cx, qy = (pl[c * 2 + 1] - y0) / cy;
+      if (pr.kind === 'wrap' && Math.max(ax, bx, qx) - Math.min(ax, bx, qx) > span / cx) continue; // crosses the seam
+      const minx = Math.max(0, Math.floor(Math.min(ax, bx, qx))), maxx = Math.min(GW - 1, Math.ceil(Math.max(ax, bx, qx)));
+      const miny = Math.max(0, Math.floor(Math.min(ay, by, qy))), maxy = Math.min(GH - 1, Math.ceil(Math.max(ay, by, qy)));
+      const den = (by - qy) * (ax - qx) + (qx - bx) * (ay - qy);
+      if (Math.abs(den) < 1e-12 || (maxx - minx) * (maxy - miny) === 0) { // edge-on or tiny: mark its corners
+        for (const [x, y, v] of [[ax, ay, a], [bx, by, b], [qx, qy, c]]) { const i = Math.round(y) * GW + Math.round(x); if (i >= 0 && i < D.length && dp[v] < D[i]) D[i] = dp[v]; }
+        continue;
+      }
+      for (let y = miny; y <= maxy; y++) for (let x = minx; x <= maxx; x++) {
+        const w1 = ((by - qy) * (x - qx) + (qx - bx) * (y - qy)) / den, w2 = ((qy - ay) * (x - qx) + (ax - qx) * (y - qy)) / den, w3 = 1 - w1 - w2;
+        if (w1 < -1e-6 || w2 < -1e-6 || w3 < -1e-6) continue;
+        const z = w1 * dp[a] + w2 * dp[b] + w3 * dp[c], i = y * GW + x; if (z < D[i]) D[i] = z;
+      }
+    }
+    // the nearest surface among the neighbouring cells, so a point is never hidden by its own triangle's sampling
+    return (q, z, tol) => {
+      const fx = (q[0] - x0) / cx, fy = (q[1] - y0) / cy, ix = Math.round(fx), iy = Math.round(fy);
+      if (ix < 0 || iy < 0 || ix >= GW || iy >= GH) return true;
+      let m = Infinity;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const x = ix + dx, y = iy + dy; if (x >= 0 && y >= 0 && x < GW && y < GH && D[y * GW + x] > -Infinity) { const v = D[y * GW + x]; if (v < m) m = v; } }
+      return z <= m + tol;
+    };
+  }
+
+  // Paint a mesh. o: { art: {width,height,labels,mask}, stateOf: label -> colour key (0 = leave unpainted; keys become
+  // filament numbers later in paintStrings, so changing slots needs no repaint),
+  // projection options for makeProjector, minEdge (mm), preview (bool) }.
+  // Returns per-triangle paint strings, counts, and optionally preview triangles {positions, states}.
+  function paintMesh(mesh, o) {
+    const pr = makeProjector(o), { width: W, height: H, labels, mask } = o.art, P = mesh.positions, I = mesh.indices;
+    const stateAt = (x, y) => { // image pixel -> state (-1 outside the picture)
+      const xi = Math.floor(x), yi = Math.floor(y); if (xi < 0 || yi < 0 || xi >= W || yi >= H) return 0;
+      const i = yi * W + xi; return mask && !mask[i] ? 0 : labels[i] >= 0 ? o.stateOf[labels[i]] || 0 : 0;
+    };
+    // summed-area table of colour edges: a box with none inside is a single colour
+    const E = new Uint32Array((W + 1) * (H + 1));
+    for (let y = 0; y < H; y++) { let row = 0;
+      for (let x = 0; x < W; x++) {
+        const s = stateAt(x, y), e = (x + 1 < W && stateAt(x + 1, y) !== s) || (y + 1 < H && stateAt(x, y + 1) !== s) ? 1 : 0;
+        row += e; E[(y + 1) * (W + 1) + x + 1] = E[y * (W + 1) + x + 1] + row;
+      } }
+    const edgesIn = (x0, y0, x1, y1) => {
+      x0 = Math.max(0, Math.floor(x0) - 1); y0 = Math.max(0, Math.floor(y0) - 1); x1 = Math.min(W, Math.ceil(x1) + 1); y1 = Math.min(H, Math.ceil(y1) + 1);
+      if (x1 <= x0 || y1 <= y0) return 0;
+      return E[y1 * (W + 1) + x1] - E[y0 * (W + 1) + x1] - E[y1 * (W + 1) + x0] + E[y0 * (W + 1) + x0];
+    };
+    const size = Math.max(o.mmPerPx * Math.max(W, H), 1), cell = Math.max(0.1, Math.min(o.mmPerPx * 2, size / 600));
+    const visible = depthMap(mesh, pr, cell), tol = Math.max(0.4, cell * 3);
+    const minEdge = o.minEdge || 0.25, maxDepth = 40;
+    const trees = new Array(I.length / 3).fill(null), prevP = [], prevS = [];
+    const counts = {}; let painted = 0, leaves = 0;
+    const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], len = v => Math.hypot(v[0], v[1], v[2]);
+    const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
+    const sampleState = (p, n) => {
+      if (!pr.faces(p, n) || !visible(pr.plane(p), pr.depth(p), tol)) return 0;
+      const q = pr.px(p); return stateAt(q[0], q[1]);
+    };
+    for (let t = 0; t < I.length; t += 3) {
+      const A = [P[I[t] * 3], P[I[t] * 3 + 1], P[I[t] * 3 + 2]], B = [P[I[t + 1] * 3], P[I[t + 1] * 3 + 1], P[I[t + 1] * 3 + 2]], Cc = [P[I[t + 2] * 3], P[I[t + 2] * 3 + 1], P[I[t + 2] * 3 + 2]];
+      const e1 = sub(B, A), e2 = sub(Cc, A); let n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]]; const nl = len(n) || 1; n = n.map(v => v / nl);
+      const tok = []; let any = false;
+      // flat projection: a triangle facing away never takes paint
+      if (pr.kind === 'flat' && !pr.faces(A, n)) continue;
+      const rec = (a, b, c, depth) => {
+        const pa = pr.px(a), pb = pr.px(b), pc = pr.px(c);
+        const longest = Math.max(len(sub(a, b)), len(sub(b, c)), len(sub(c, a)));
+        const pts = [a, b, c, mid(a, b), mid(b, c), mid(c, a), [(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3]];
+        const st = pts.map(p => sampleState(p, n)), s0 = st[6];
+        let uniform = st.every(s => s === s0);
+        if (uniform && longest > minEdge) {
+          const xs = [pa[0], pb[0], pc[0]], ys = [pa[1], pb[1], pc[1]];
+          const us = [pr.plane(a)[0], pr.plane(b)[0], pr.plane(c)[0]], seamCut = pr.seam && Math.max(...us) - Math.min(...us) > pr.seam;
+          const offPic = Math.max(...xs) < 0 || Math.min(...xs) > W || Math.max(...ys) < 0 || Math.min(...ys) > H;
+          if (seamCut || (!offPic && edgesIn(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)) > 0)) uniform = false;
+        }
+        if (uniform || longest <= minEdge || depth >= maxDepth) {
+          const s = uniform ? s0 : mode7(st);
+          tok.push(s);
+          if (s) { any = true; counts[s] = (counts[s] || 0) + 1; }
+          leaves++;
+          if (o.preview && s) { prevP.push(...a, ...b, ...c); prevS.push(s); }
+          return;
+        }
+        // split the longest edge in two (Orca's one-side split): keeps the pieces well shaped, where a four-way
+        // split of a long thin triangle would chop it far finer than needed across its short side
+        const L0 = len(sub(b, c)), L1 = len(sub(c, a)), L2 = len(sub(a, b)), sd = L0 >= L1 && L0 >= L2 ? 0 : L1 >= L2 ? 1 : 2;
+        const v = sd === 0 ? [a, b, c] : sd === 1 ? [b, c, a] : [c, a, b], m = mid(v[1], v[2]);
+        tok.push(-2 - sd);
+        // children: 0 = (v0, v1, m), 1 = (m, v2, v0); written in reverse order
+        rec(m, v[2], v[0], depth + 1); rec(v[0], v[1], m, depth + 1);
+      };
+      rec(A, B, Cc, 0);
+      if (any) { trees[t / 3] = Int8Array.from(tok); painted++; }
+    }
+    return { trees, painted, leaves, counts, preview: o.preview ? { positions: new Float32Array(prevP), states: Uint8Array.from(prevS) } : null, projector: pr };
+  }
+  function mode7(a) { const m = new Map(); let best = a[6], bn = 0; for (const s of a) { const c = (m.get(s) || 0) + 1; m.set(s, c); if (c > bn) { bn = c; best = s; } } return best; }
+
+  const api = { loadMesh, paintMesh, paintStrings, makeProjector, unzip, parseSTL, amfXML, orca3MF, orca3MFFiles, buildCookie, buildKeychain, buildCoin, artRadiusPx, simplifyClusters, componentAt, removeBackground, cropAndScale, kmeans, modeFilter, mergeSmall, regionStats, buildTray, stlBinary, threeMF, zip, hex, _ms: marchingSquares, _shapes: loopsToShapes, _edt: edt };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.TrayCore = api;
 })(typeof window !== 'undefined' ? window : globalThis);
