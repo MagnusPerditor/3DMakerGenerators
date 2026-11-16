@@ -87,6 +87,10 @@ h1 { font: 700 30px/1.05 var(--display); letter-spacing: -0.02em; margin: 0 0 6p
 #pmDrop.loaded { border-style: solid; }
 #pmView { grid-column: 1 / -1; justify-self: start; border: 1px solid var(--line); background: var(--paper); color: var(--ink); border-radius: 6px; padding: 4px 10px; font: inherit; font-size: 13px; cursor: pointer; }
 #pmView:hover { border-color: var(--brass); }
+.pm-size { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: -4px 0 6px; font-size: 13.5px; }
+.pm-size label { font-weight: 500; }
+.pm-size .num input { width: 76px; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
+#pmSizeTxt { color: var(--muted); }
 body.gen-paint #dl3mf, body.gen-paint #dlZip, body.gen-paint #dlStl, body.gen-paint #uniformH, body.gen-paint label:has(> #uniformH), body.gen-paint #imgHField, body.gen-paint #smoothField, body.gen-paint #smoothField + .hint { display: none; }
 .drop span { color: var(--muted); font-size: 13.5px; }
 
@@ -725,6 +729,14 @@ input[type=color]:not([data-native]) { cursor: pointer; }
         <span id="pmInfo">STL or 3MF. Its shape is not changed; the art is painted onto the surface like Orca's color painting tool.</span>
         <input type="file" id="pmFile" accept=".stl,.3mf,model/stl,model/3mf" hidden>
       </label>
+      <div id="pmScaleBox" hidden>
+      <div class="field" id="pmScaleField">
+        <label for="pmScale">Model scale</label><span class="num"><input type="number" id="pmScaleNum" min="5" max="1000" step="0.1" value="100" inputmode="decimal" aria-label="Model scale"><span>%</span></span>
+        <input type="range" id="pmScale" min="5" max="1000" step="0.1" value="100">
+      </div>
+      <div class="pm-size"><label for="pmHmm">Height</label><span class="num"><input type="number" id="pmHmm" min="1" max="1000" step="0.1" value="0" inputmode="decimal" aria-label="Model height"><span>mm</span></span><span id="pmSizeTxt"></span></div>
+      <p class="hint">Scales the whole model evenly. The art keeps its place on it, growing and shrinking with the model.</p>
+      </div>
       <div class="seg" role="radiogroup" aria-label="How the art goes on">
         <input type="radio" name="pmMode" id="pmFlat" value="flat" checked><label for="pmFlat">Straight on</label>
         <input type="radio" name="pmMode" id="pmWrap" value="wrap"><label for="pmWrap">Wrap around</label>
@@ -1329,6 +1341,7 @@ async function build() {
     }
     if (S.gen === 'paint') {
       if (!S.model) { status('Choose the model to paint (STL or 3MF) under Paint a model.'); return; }
+      applyModelScale(false);
       if (S.pmNeedsFit) { S.pmNeedsFit = false; pmDefaults(); clearTimeout(S.buildTimer); } // size the art to the model once both are in
       status('Painting the model…'); await later(() => {});
       if (token !== S.buildToken) return;
@@ -1589,6 +1602,21 @@ async function inflateRaw(b) {
   if (typeof DecompressionStream !== 'function') throw new Error('this browser cannot unpack 3MF files; try the STL instead');
   return new Uint8Array(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
 }
+// the model at the chosen scale (kept separately from the loaded original so scaling never compounds);
+// moveArt keeps the art the same size and place relative to the model
+function applyModelScale(moveArt) {
+  const o = S.modelOrig; if (!o) return false;
+  const k = +$('pmScale').value / 100, prev = S.model ? S.model.scale : k;
+  if (S.model && Math.abs(prev - k) < 1e-9) return false;
+  const P = new Float32Array(o.positions.length); for (let i = 0; i < P.length; i++) P[i] = o.positions[i] * k;
+  S.model = { positions: P, indices: o.indices, size: o.size.map(v => v * k), name: o.name, wrapR: o.wrapR * k, scale: k };
+  if (moveArt && prev) { const f = k / prev; ['pmW', 'pmX', 'pmY'].forEach(id => { const el = $(id); el.value = Math.min(+el.max, Math.max(+el.min, +el.value * f)); el.dispatchEvent(new Event('input')); }); }
+  const m = S.model.size;
+  if (document.activeElement !== $('pmHmm')) $('pmHmm').value = m[2].toFixed(1);
+  $('pmSizeTxt').textContent = `${m[0].toFixed(1)} × ${m[1].toFixed(1)} mm footprint`;
+  if (gl) gl.framed = false;
+  return true;
+}
 async function loadModelFile(file) {
   if (!file) return;
   if (!/\.(stl|3mf)$/i.test(file.name)) { status('Choose an .stl or .3mf model file.'); return; }
@@ -1597,10 +1625,13 @@ async function loadModelFile(file) {
     const mesh = await C.loadMesh(file.name, new Uint8Array(await file.arrayBuffer()), inflateRaw);
     mesh.name = file.name.replace(/\.(stl|3mf)$/i, '').slice(0, 60) || 'Model';
     mesh.wrapR = wrapRadius(mesh);
-    S.model = mesh;
+    S.modelOrig = mesh; S.model = null;
+    $('pmScale').value = 100; $('pmScale').dispatchEvent(new Event('input'));
+    applyModelScale(false);
     const m = mesh.size;
     $('pmTitle').textContent = mesh.name;
-    $('pmInfo').textContent = `${m[0].toFixed(1)} × ${m[1].toFixed(1)} × ${m[2].toFixed(1)} mm, ${(mesh.indices.length / 3).toLocaleString()} triangles. Click to choose another model.`;
+    $('pmInfo').textContent = `${m[0].toFixed(1)} × ${m[1].toFixed(1)} × ${m[2].toFixed(1)} mm as loaded, ${(mesh.indices.length / 3).toLocaleString()} triangles. Click to choose another model.`;
+    $('pmScaleBox').hidden = false;
     $('pmDrop').classList.add('loaded');
     if (gl) gl.framed = false;
     // a round model probably wants the wrap
@@ -1625,6 +1656,13 @@ $('pmView').addEventListener('click', () => {
   S.pmViewDir = [d.x, d.y, d.z]; $('pmDir').value = 'view'; pmDefaults(); scheduleBuild();
 });
 ['pmW', 'pmX', 'pmY', 'pmRot', 'pmTurn', 'pmAngle', 'pmDetail'].forEach(id => $(id).addEventListener('input', scheduleBuild));
+$('pmScale').addEventListener('input', () => { if (!applyModelScale(true)) return; if (S.prep && S.prep.labels) scheduleBuild(); else showModelOnly(); });
+$('pmHmm').addEventListener('change', () => {
+  const o = S.modelOrig, h = parseFloat($('pmHmm').value); if (!o || !(h > 0) || !(o.size[2] > 0)) return;
+  const el = $('pmScale'), pct = Math.min(+el.max, Math.max(+el.min, h / o.size[2] * 100));
+  el.value = pct; el.dispatchEvent(new Event('input')); $('pmHmm').blur();
+});
+$('pmHmm').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('pmHmm').dispatchEvent(new Event('change')); } });
 syncPmMode();
 $('kFaceDown').addEventListener('change', () => { if (S.tray) { status(''); recordState(); magnetHint(); } });
 ['ckSize', 'ckH', 'ckWall', 'ckBlade', 'ckLip', 'ckLipH', 'ckGaps', 'ckBoost', 'ckRel', 'ckST', 'ckClr'].forEach(id => $(id).addEventListener('input', scheduleBuild));
@@ -1664,7 +1702,7 @@ $('uniformH').addEventListener('change', syncCoinMode);
 // every setting in the panel, orientation and generator. Taken after each rebuild settles, so a
 // slider drag or a run of quick edits lands as one step.
 const H = { undo: [], redo: [], cur: null, restoring: false, LIMIT: 40, seq: 0 };
-const CONTROL_SKIP = new Set(['file', 'fileName', 'spQ', 'spCustom', 'paintColor', 'popColor', 'popH', 'spClosest']);
+const CONTROL_SKIP = new Set(['file', 'fileName', 'pmHmm', 'spQ', 'spCustom', 'paintColor', 'popColor', 'popH', 'spClosest']);
 function controlState() {
   const out = {};
   document.querySelectorAll('.panel input[id], .panel select[id], .panel textarea[id]').forEach(el => {
