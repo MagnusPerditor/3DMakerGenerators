@@ -1121,7 +1121,7 @@ function renderRegions() {
     const el = document.createElement('div');
     el.dataset.i = i;
     el.className = 'region' + (r.merge !== -1 ? ' merged' : '') + (S.sel && S.sel.label === i ? ' active' : '');
-    const opts = ['<option value="-1">Own filament</option>', '<option value="-2">Leave flat (base)</option>']
+    const opts = ['<option value="-1">Own filament</option>', S.gen === 'paint' ? '<option value="-2">Model filament (unpainted)</option>' : '<option value="-2">Leave flat (base)</option>']
         .concat(S.regions.map((o, j) => j === i || !(o.pixels > 0) ? '' : `<option value="${j}">Same as ${escapeHtml(o.name)}</option>`)).join('');
     el.innerHTML = `
       <span class="chip"><input type="color" value="${r.filament}" aria-label="Filament color for ${escapeHtml(r.name)}"></span>
@@ -1535,7 +1535,7 @@ function setGen(g) {
   document.title = '3D Maker Generators · ' + GEN_NAME[g];
   if (gl) gl.framed = false;
   syncCoinMode(); closePop();
-  if (S.prep && S.prep.labels) renderRimOptions();
+  if (S.prep && S.prep.labels) { renderRegions(); renderRimOptions(); }
   if (S.pendingRimFil != null) { const s = $('kRimFil'); if ([...s.options].some(o => o.value === S.pendingRimFil)) s.value = S.pendingRimFil; S.pendingRimFil = null; }
   syncKcShape(); renderTally();
   if (S.prep && S.prep.labels) { renderRegions(); scheduleBuild(); }

@@ -1329,10 +1329,11 @@
       // angle measured from the front (-Y) going round to the right (+X), so the art reads normally from the front
       const ang = (x, y) => { let t = Math.atan2(x - ax, -(y - ay)) - t0; while (t > Math.PI) t -= 2 * Math.PI; while (t < -Math.PI) t += 2 * Math.PI; return t; };
       return {
-        kind: 'wrap', W, H, seam: Math.PI * R,
+        kind: 'wrap', W, H, seam: Math.PI * R, cosLim,
         plane: p => [ang(p[0], p[1]) * R, p[2] - (o.zc || 0)],
         px: p => toPx(ang(p[0], p[1]) * R, p[2] - (o.zc || 0)),
         depth: p => -Math.hypot(p[0] - ax, p[1] - ay),
+        cosAt: (p, n) => { const dx = p[0] - ax, dy = p[1] - ay, r = Math.hypot(dx, dy) || 1; return (n[0] * dx + n[1] * dy) / r; },
         faces: (p, n) => { const dx = p[0] - ax, dy = p[1] - ay, r = Math.hypot(dx, dy) || 1; return (n[0] * dx + n[1] * dy) / r >= cosLim; },
       };
     }
@@ -1344,9 +1345,10 @@
     const c = o.center || [0, 0, 0];
     const plane = p => { const x = p[0] - c[0], y = p[1] - c[1], z = p[2] - c[2]; return [x * rx + y * ry + z * rz, x * ux + y * uy + z * uz]; };
     return {
-      kind: 'flat', W, H, right: [rx, ry, rz], up: [ux, uy, uz],
+      kind: 'flat', W, H, cosLim, right: [rx, ry, rz], up: [ux, uy, uz],
       plane, px: p => { const q = plane(p); return toPx(q[0], q[1]); },
       depth: p => p[0] * d[0] + p[1] * d[1] + p[2] * d[2],
+      cosAt: (p, n) => -(n[0] * d[0] + n[1] * d[1] + n[2] * d[2]),
       faces: (p, n) => -(n[0] * d[0] + n[1] * d[1] + n[2] * d[2]) >= cosLim,
     };
   }
@@ -1413,14 +1415,17 @@
       return E[y1 * (W + 1) + x1] - E[y0 * (W + 1) + x1] - E[y1 * (W + 1) + x0] + E[y0 * (W + 1) + x0];
     };
     const size = Math.max(o.mmPerPx * Math.max(W, H), 1), cell = Math.max(0.1, Math.min(o.mmPerPx * 2, size / 600));
-    const visible = depthMap(mesh, pr, cell), tol = Math.max(0.4, cell * 3);
+    const visible = depthMap(mesh, pr, cell), tol0 = Math.max(0.4, cell * 3);
     const minEdge = o.minEdge || 0.25, maxDepth = 40;
     const trees = new Array(I.length / 3).fill(null), prevP = [], prevS = [];
     const counts = {}; let painted = 0, leaves = 0;
     const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], len = v => Math.hypot(v[0], v[1], v[2]);
     const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
     const sampleState = (p, n) => {
-      if (!pr.faces(p, n) || !visible(pr.plane(p), pr.depth(p), tol)) return 0;
+      // a sloped surface changes depth from one map cell to the next, so allow for its own slope
+      const c = pr.cosAt(p, n); if (c < pr.cosLim) return 0;
+      const slope = Math.min(8, Math.sqrt(Math.max(0, 1 - c * c)) / Math.max(c, 0.05));
+      if (!visible(pr.plane(p), pr.depth(p), tol0 + 2.5 * cell * slope)) return 0;
       const q = pr.px(p); return stateAt(q[0], q[1]);
     };
     for (let t = 0; t < I.length; t += 3) {
