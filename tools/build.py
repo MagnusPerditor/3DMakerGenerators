@@ -8,6 +8,9 @@ Targets
   web      dist/maker-generators.html             single file; loads three.js and fonts from CDNs
   plugin   dist/maker_generators_orca_plugin.py   OrcaSlicer 2.5 plugin, everything inlined (works offline)
   desktop  desktop/app/                           Neutralino project, ready for `neu build` (see README)
+
+The version comes from the VERSION file and is stamped into the page, plugin, desktop config,
+installer script and package.json on every build.
 """
 import base64, os, re, shutil, sys, zlib
 
@@ -33,8 +36,26 @@ def replace_once(src, old, new):
     return src.replace(old, new)
 
 
+VERSION = read(ROOT, 'VERSION').strip()
+
+
+def sync_version():
+    """VERSION is the one place the version lives; stamp it into everything that carries one."""
+    for path, pattern, repl in (
+            (('plugin', 'plugin_template.py'), r'# version = "[^"]*"', f'# version = "{VERSION}"'),
+            (('desktop', 'neutralino.config.json'), r'"version": "[^"]*"', f'"version": "{VERSION}"'),
+            (('desktop', 'installer.nsi'), r'!define VERSION(\s+)"[^"]*"', rf'!define VERSION\g<1>"{VERSION}"'),
+            (('package.json',), r'"private": true,', f'"version": "{VERSION}",\n  "private": true,')):
+        src = read(ROOT, *path)
+        if path == ('package.json',):
+            src = re.sub(r'\s*"version": "[^"]*",', '', src, count=1)
+        new = re.sub(pattern, repl, src, count=1)
+        if new != src:
+            write(os.path.join(ROOT, *path), new)
+
+
 def web_page():
-    page = read(SRC, 'app.html')
+    page = read(SRC, 'app.html').replace('__APP_VERSION__', VERSION)
     db = read(SRC, 'spoolmandb.json').replace('</', '<\\/')
     return page.replace('/*CORE*/', read(SRC, 'core.js')).replace('/*SPOOLMANDB*/', db)
 
@@ -101,6 +122,7 @@ def build_desktop():
 TARGETS = {'web': build_web, 'plugin': build_plugin, 'desktop': build_desktop}
 
 if __name__ == '__main__':
+    sync_version()
     wanted = sys.argv[1:] or list(TARGETS)
     for t in wanted:
         if t not in TARGETS:
