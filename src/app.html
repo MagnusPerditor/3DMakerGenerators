@@ -86,8 +86,11 @@ h1 { font: 700 30px/1.05 var(--display); letter-spacing: -0.02em; margin: 0 0 6p
 h1 .ver { font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing: 0; vertical-align: middle; }
 #pmDrop { margin-bottom: 12px; padding: 16px 14px; }
 #pmDrop.loaded { border-style: solid; }
-#pmView { grid-column: 1 / -1; justify-self: start; border: 1px solid var(--line); background: var(--paper); color: var(--ink); border-radius: 6px; padding: 4px 10px; font: inherit; font-size: 13px; cursor: pointer; }
-#pmView:hover { border-color: var(--brass); }
+.pm-place { display: flex; gap: 8px; flex-wrap: wrap; margin: -2px 0 12px; }
+.pm-place button { border: 1px solid var(--line); background: var(--paper); color: var(--ink); border-radius: 6px; padding: 5px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+.pm-place button:hover { border-color: var(--brass); }
+#pmPlace.on { background: var(--brass); border-color: var(--brass); color: #fff; }
+body.placing #view3d canvas, body.placing canvas { cursor: crosshair; }
 .pm-size { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: -4px 0 6px; font-size: 13.5px; }
 .pm-size label { font-weight: 500; }
 .pm-size .num input { width: 76px; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
@@ -745,8 +748,11 @@ input[type=color]:not([data-native]) { cursor: pointer; }
       <p class="hint" id="pmModeHint">Projects the art straight onto one side, like a slide projector. Best for flat and gently curved faces.</p>
       <div class="field" id="pmDirField">
         <label for="pmDir">Paint from</label>
-        <select id="pmDir"><option value="front">Front</option><option value="back">Back</option><option value="left">Left</option><option value="right">Right</option><option value="top">Top</option><option value="view">Current 3D view</option></select>
-        <button type="button" class="mini" id="pmView" title="Paint from the direction the 3D view is looking">Use 3D view</button>
+        <select id="pmDir"><option value="front">Front</option><option value="back">Back</option><option value="left">Left</option><option value="right">Right</option><option value="top">Top</option><option value="view">Current 3D view</option><option value="click">Where I clicked</option></select>
+      </div>
+      <div class="pm-place">
+        <button type="button" id="pmPlace" title="Then click the spot on the model in the 3D view">Click the model to place the art</button>
+        <button type="button" id="pmView" title="Paint from the direction the 3D view is looking">Use 3D view</button>
       </div>
       <div class="field" id="pmWField">
         <label for="pmW">Art width</label><span class="num"><input type="number" id="pmWNum" min="5" max="400" step="0.5" value="60" inputmode="decimal" aria-label="Art width"><span>mm</span></span>
@@ -1010,6 +1016,7 @@ async function runBackground() {
   });
   if (!S.prep) { status(''); return; }
   ['s2', 's3', 's4', 'sText', 's5'].forEach(id => enable(id, true));
+  CMP = null; syncTextUI();
   $('clickHint').hidden = false;
   drawThumbs();
   await runColors(true);
@@ -1521,6 +1528,10 @@ function setGen(g) {
   for (const k in GEN_BTN) $(GEN_BTN[k]).setAttribute('aria-selected', k === g);
   document.body.classList.toggle('gen-cookie', g === 'cookie');
   document.body.classList.toggle('gen-paint', g === 'paint'); $('pmOpts').hidden = g !== 'paint';
+  if (g !== 'paint') setPlacing(false);
+  syncTextOnly();
+  // Paint a model can start from the model (and text) alone, so its steps open before any image
+  ['sText', 's5'].forEach(id => enable(id, g === 'paint' || !!(S.prep && S.prep.labels)));
   $('baseWord').textContent = g === 'paint' ? 'Model' : 'Base';
   $('dlOrca').classList.toggle('primary', g === 'paint');
   if (!S.dlHintText) S.dlHintText = $('dlHint').innerHTML;
@@ -1549,13 +1560,24 @@ $('genBook').addEventListener('click', () => setGen('bookmark'));
 $('genCookie').addEventListener('click', () => setGen('cookie'));
 $('genFlat').addEventListener('click', () => setGen('flat'));
 $('genDust').addEventListener('click', () => setGen('dust'));
-$('genPaint').addEventListener('click', () => { setGen('paint'); if (!S.model && !S.prep) status('Choose an image and a model to paint.'); else if (S.model && !(S.prep && S.prep.labels)) showModelOnly(); });
+$('genPaint').addEventListener('click', () => { setGen('paint'); if (!S.model) status('Choose the model to paint, then add an image, some text, or both.'); else if (!(S.prep && S.prep.labels)) showModelOnly(); else scheduleBuild(); });
 // ---------- paint a model ----------
+// Text alone (no image): a blank stand-in picture for the text to sit on. A real image replaces it.
+function syncTextOnly() {
+  const want = S.gen === 'paint' && !S.img && !!$('tText').value.trim();
+  if (want && !(S.prep && S.prep.textOnly)) {
+    const n = 1000 * 1000;
+    S.prep = { width: 1000, height: 1000, mask: new Uint8Array(n), labels: new Int16Array(n).fill(-1), data: new Uint8ClampedArray(n * 4), textOnly: true };
+    S.regions = []; CMP = null; S.pmNeedsFit = !!S.model;
+    renderRegions(); renderRimOptions();
+  } else if (!want && S.prep && S.prep.textOnly) { S.prep = null; CMP = null; if (S.model && S.gen === 'paint') showModelOnly(); }
+  syncTextUI();
+}
 // Load the person's own STL/3MF, project the art onto it and keep the result as Orca color painting.
 S.model = null; S.pmViewDir = [0, 1, 0];
 const PM_DIRS = { front: [0, 1, 0], back: [0, -1, 0], left: [1, 0, 0], right: [-1, 0, 0], top: [0, 0, -1] };
 const pmMode = () => (document.querySelector('input[name=pmMode]:checked') || {}).value || 'flat';
-const pmDirVec = () => $('pmDir').value === 'view' ? S.pmViewDir : PM_DIRS[$('pmDir').value];
+const pmDirVec = () => $('pmDir').value === 'view' ? S.pmViewDir : $('pmDir').value === 'click' && S.pmClick ? S.pmClick.dir : PM_DIRS[$('pmDir').value] || PM_DIRS.front;
 // the axis and radius to wrap around: a circle fitted to the outward-facing side walls, dropping whatever does not
 // sit on it (a mug handle, a spout, the inside wall), so the art wraps round the body and is not stretched
 function wrapFit(mesh) {
@@ -1594,10 +1616,11 @@ function pmSet(id, v) { const el = $(id); el.value = Math.min(+el.max, Math.max(
 // a sensible art size for the chosen side: as big as fits with a little room around it
 function pmDefaults() {
   if (!S.model) return;
-  const [sx, sy, sz] = S.model.size, p = S.prep, aspect = p ? p.width / p.height : 1;
+  const [sx, sy, sz] = S.model.size, p = S.prep, cmp = p && p.labels ? composite() : null;
+  const aspect = cmp ? cmp.W / cmp.H : p ? p.width / p.height : 1;
   let fw, fh;
   if (pmMode() === 'wrap') { fw = Math.PI * S.model.wrapR * 0.7; fh = sz; }
-  else { const d = $('pmDir').value; fw = d === 'left' || d === 'right' ? sy : sx; fh = d === 'top' ? sy : sz; if (d === 'view') { fw = Math.max(sx, sy); fh = sz; } }
+  else { const d = $('pmDir').value; fw = d === 'left' || d === 'right' ? sy : sx; fh = d === 'top' ? sy : sz; if (d === 'view' || d === 'click') { fw = Math.max(sx, sy); fh = sz; } }
   pmSet('pmW', Math.round(Math.min(fw * 0.8, fh * 0.8 * aspect) * 2) / 2);
   pmSet('pmX', 0); pmSet('pmY', 0);
 }
@@ -1615,7 +1638,9 @@ function paintModel(art, cmp) {
   const mesh = S.model, sz = mesh.size, mmPerPx = +$('pmW').value / art.width;
   const o = { art, stateOf, mmPerPx, offX: +$('pmX').value, offY: +$('pmY').value, rotation: +$('pmRot').value, maxAngle: +$('pmAngle').value, minEdge: +$('pmDetail').value, preview: true };
   if (pmMode() === 'wrap') Object.assign(o, { kind: 'wrap', axis: mesh.wrapAxis, radius: mesh.wrapR, zc: sz[2] / 2, startDeg: +$('pmTurn').value });
-  else Object.assign(o, { kind: 'flat', dir: pmDirVec(), center: mesh.round ? [mesh.wrapAxis[0], mesh.wrapAxis[1], sz[2] / 2] : [0, 0, sz[2] / 2] }); // a round body is centred on its own axis, not the handle
+  else Object.assign(o, { kind: 'flat', dir: pmDirVec(),
+    // a clicked spot is the centre; otherwise a round body is centred on its own axis, not the handle
+    center: $('pmDir').value === 'click' && S.pmClick ? S.pmClick.center : mesh.round ? [mesh.wrapAxis[0], mesh.wrapAxis[1], sz[2] / 2] : [0, 0, sz[2] / 2] });
   const r = C.paintMesh(mesh, o);
   return { parts: [{ id: 'base', mesh }], size: [sz[0], sz[1]], height: sz[2], mmPerPx, trees: r.trees, painted: r.painted, keyColors, preview: r.preview,
     map: { toArt3: pt => r.projector.px([pt.x, pt.y, pt.z]) } };
@@ -1639,6 +1664,7 @@ function applyModelScale(moveArt) {
   if (S.model && Math.abs(prev - k) < 1e-9) return false;
   const P = new Float32Array(o.positions.length); for (let i = 0; i < P.length; i++) P[i] = o.positions[i] * k;
   S.model = { positions: P, indices: o.indices, size: o.size.map(v => v * k), name: o.name, wrapR: o.wrapR * k, wrapAxis: o.wrapAxis.map(v => v * k), round: o.round, scale: k };
+  if (S.pmClick && prev) { const f = k / prev; S.pmClick.center = S.pmClick.center.map(v => v * f); }
   if (moveArt && prev) { const f = k / prev; ['pmW', 'pmX', 'pmY'].forEach(id => { const el = $(id); el.value = Math.min(+el.max, Math.max(+el.min, +el.value * f)); el.dispatchEvent(new Event('input')); }); }
   const m = S.model.size;
   if (document.activeElement !== $('pmHmm')) $('pmHmm').value = m[2].toFixed(1);
@@ -1654,7 +1680,9 @@ async function loadModelFile(file) {
     const mesh = await C.loadMesh(file.name, new Uint8Array(await file.arrayBuffer()), inflateRaw);
     mesh.name = file.name.replace(/\.(stl|3mf)$/i, '').slice(0, 60) || 'Model';
     const fit = wrapFit(mesh); mesh.wrapR = fit.R; mesh.wrapAxis = fit.axis; mesh.round = fit.round;
-    S.modelOrig = mesh; S.model = null;
+    S.modelOrig = mesh; S.model = null; S.pmClick = null;
+    if ($('pmDir').value === 'click') $('pmDir').value = 'front';
+    if (!S.img) { S.name = mesh.name.replace(/[^\w-]+/g, '_'); $('fileName').value = S.name + GEN.paint.suffix; }
     $('pmScale').value = 100; $('pmScale').dispatchEvent(new Event('input'));
     applyModelScale(false);
     const m = mesh.size;
@@ -1667,9 +1695,9 @@ async function loadModelFile(file) {
     const roundish = mesh.round;
     if (roundish !== (pmMode() === 'wrap')) { $(roundish ? 'pmWrap' : 'pmFlat').checked = true; syncPmMode(); }
     pmDefaults(); S.pmNeedsFit = true;
-    if (S.gen !== 'paint') setGen('paint');
+    if (S.gen !== 'paint') setGen('paint'); else syncTextOnly();
     status('');
-    if (S.prep && S.prep.labels) scheduleBuild(); else { showModelOnly(); status('Now add the image to paint on it.'); }
+    if (S.prep && S.prep.labels) scheduleBuild(); else { showModelOnly(); status('Now add an image, or type some text under Text, to paint on it.'); }
   } catch (e) { console.error(e); status('Could not read that model: ' + e.message); }
 }
 $('pmFile').addEventListener('change', e => { loadModelFile(e.target.files[0]); e.target.value = ''; });
@@ -1685,6 +1713,33 @@ $('pmView').addEventListener('click', () => {
   S.pmViewDir = [d.x, d.y, d.z]; $('pmDir').value = 'view'; pmDefaults(); scheduleBuild();
 });
 ['pmW', 'pmX', 'pmY', 'pmRot', 'pmTurn', 'pmAngle', 'pmDetail'].forEach(id => $(id).addEventListener('input', scheduleBuild));
+// Click the model to place the art: the art is centred on the clicked spot. Straight on, it is painted along
+// the surface's own facing there; wrapped, the click sets how far round and how high the art sits.
+function setPlacing(on) {
+  S.placing = !!on && !!S.model;
+  $('pmPlace').classList.toggle('on', S.placing);
+  $('pmPlace').textContent = S.placing ? 'Now click the model… (Esc to cancel)' : 'Click the model to place the art';
+  document.body.classList.toggle('placing', S.placing);
+  if (S.placing) { setView('3d'); status('Click the spot on the model where the middle of the art should go.'); }
+  else if (/^Click the spot/.test($('status').textContent)) status('');
+}
+function placeArtAt(hit) {
+  const p = hit.point, n = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : new THREE.Vector3(0, -1, 0);
+  const m = S.model;
+  if (pmMode() === 'wrap') {
+    const [ax, ay] = m.wrapAxis; let t = Math.atan2(p.x - ax, -(p.y - ay)) * 180 / Math.PI;
+    pmSet('pmTurn', Math.round(t)); pmSet('pmX', 0); pmSet('pmY', Math.round((p.z - m.size[2] / 2) * 2) / 2);
+  } else {
+    S.pmClick = { dir: [-n.x, -n.y, -n.z], center: [p.x, p.y, p.z] };
+    $('pmDir').value = 'click'; pmSet('pmX', 0); pmSet('pmY', 0);
+  }
+  setPlacing(false); scheduleBuild();
+}
+$('pmPlace').addEventListener('click', () => {
+  if (!S.model) { status('Choose the model to paint first.'); return; }
+  setPlacing(!S.placing);
+});
+window.addEventListener('keydown', e => { if (e.key === 'Escape' && S.placing) setPlacing(false); });
 $('pmScale').addEventListener('input', () => { if (!applyModelScale(true)) return; if (S.prep && S.prep.labels) scheduleBuild(); else showModelOnly(); });
 $('pmHmm').addEventListener('change', () => {
   const o = S.modelOrig, h = parseFloat($('pmHmm').value); if (!o || !(h > 0) || !(o.size[2] > 0)) return;
@@ -1936,6 +1991,7 @@ function pick3D(e) {
   const ndc = new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
   const ray = new THREE.Raycaster(); ray.setFromCamera(ndc, gl.camera);
   const hit = ray.intersectObjects(gl.group.children, false)[0];
+  if (S.placing) { if (hit && (hit.object.userData.id === 'base' || hit.object.userData.id === 'paint')) placeArtAt(hit); return; }
   if (!hit) { closePop(); return; }
   const pt = hit.point.clone();
   if (hit.face && Math.abs(hit.face.normal.z) < 0.5 && S.gen !== 'paint') pt.addScaledVector(hit.face.normal, -0.25); // step into the part from a wall
@@ -2092,7 +2148,12 @@ function defaultTextColor() {
 function textChanged() { syncTextFil(); renderTally(); drawPreview(); scheduleBuild(); }
 function syncTextUI() {
   $('tOpts').hidden = !$('tText').value.trim();
-  $('tGapField').hidden = $('tPos').value === 'over';
+  // text with no image: its size is set by the width on the model, and there is no art to keep a gap from
+  const only = !!(S.prep && S.prep.textOnly);
+  $('tSizeField').hidden = only; $('tPos').querySelector('option[value=over]').hidden = only;
+  if (only && $('tPos').value === 'over') $('tPos').value = 'below';
+  $('pmWField').querySelector('label').textContent = only ? 'Text width' : 'Art width';
+  $('tGapField').hidden = $('tPos').value === 'over' || only;
   $('tHField').hidden = !raisedArt() || uniform();
 }
 function textSizeReadout(mmPerPx) {
@@ -2103,6 +2164,7 @@ function textSizeReadout(mmPerPx) {
   el.classList.toggle('warn', mm < 4);
 }
 $('tText').addEventListener('input', () => {
+  syncTextOnly();
   if (hasText() && !S.textC.touched) { defaultTextColor(); S.textC.touched = true; }
   syncTextUI(); textChanged();
 });

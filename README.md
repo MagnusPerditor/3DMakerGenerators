@@ -30,6 +30,8 @@ Load your own STL or 3MF and the art is painted onto it. The shape is never chan
 
 - **Straight on** projects the art onto one side (front, back, left, right, top, or the direction the 3D view is facing). Good for flat and gently curved faces.
 - **Wrap around** wraps it round a model like a label: mugs, cups, cans, vases. The wrap follows the body, not a handle or spout, and is picked automatically for round models.
+- **Text only** works too: type a name or message with no image (straight, or curved along the top or bottom).
+- **Click to place**: press *Click the model to place the art* and click the spot in the 3D view where the middle of the art should go.
 - Scale the model, then size, move, rotate and turn the art. Surfaces turned too far away, or hidden behind another part, stay unpainted. *Finest detail* sets how sharp the color edges are (0.2 mm by default).
 
 STEP files aren't read; export them as STL or 3MF first.
