@@ -81,7 +81,8 @@ The version lives in the `VERSION` file. `tools/build.py` stamps it into the pag
 
 - Face-down models (bookmarks, flat models): turn on Z-hop (0.4 mm) so travels don't scratch the back; ironing the top surface smooths it further.
 - Keep *Minimum line width* at about twice your nozzle width (0.8 mm for a 0.4 mm nozzle).
-- Painted models: the colors are only as sharp as the layer lines and nozzle allow; on side walls a smaller layer height gives cleaner edges, and on top surfaces *Finest detail* matters more.
+- Painted models: the colors are only as sharp as the layer lines and nozzle allow. When the art is on a top surface (a bowl floor, a lid), a narrower, slower top surface helps a lot: tested on a Snapmaker U1 with top surface line width 0.32 mm and top surface speed 30 mm/s, and the eyes, smile and fine fur spikes came out crisp. On side walls (a mug), a smaller layer height gives cleaner edges.
+- Painted models change filament many times, so expect a few strings between colors; a quick pass with a heat gun or lighter cleans them up.
 - Cookie cutters: print lip-down without supports; use a food-safe filament and treat FDM cutters as hand-wash items.
 
 Made by G-Tech3D / Geletka Tech. Released under the [MIT License](LICENSE); bundled third-party files keep their own licenses (see `vendor/README.md`).
