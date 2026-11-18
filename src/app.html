@@ -89,7 +89,7 @@ h1 .ver { font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing
 .pm-place { display: flex; gap: 8px; flex-wrap: wrap; margin: -2px 0 12px; }
 .pm-place button { border: 1px solid var(--line); background: var(--paper); color: var(--ink); border-radius: 6px; padding: 5px 10px; font: inherit; font-size: 13px; cursor: pointer; }
 .pm-place button:hover { border-color: var(--brass); }
-#pmPlace.on { background: var(--brass); border-color: var(--brass); color: #fff; }
+#pmLay.on, #pmPlace.on { background: var(--brass); border-color: var(--brass); color: #fff; }
 body.placing #view3d canvas, body.placing canvas { cursor: crosshair; }
 .pm-size { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: -4px 0 6px; font-size: 13.5px; }
 .pm-size label { font-weight: 500; }
@@ -740,6 +740,10 @@ input[type=color]:not([data-native]) { cursor: pointer; }
       </div>
       <div class="pm-size"><label for="pmHmm">Height</label><span class="num"><input type="number" id="pmHmm" min="1" max="1000" step="0.1" value="0" inputmode="decimal" aria-label="Model height"><span>mm</span></span><span id="pmSizeTxt"></span></div>
       <p class="hint">Scales the whole model evenly. The art keeps its place on it, growing and shrinking with the model.</p>
+      <div class="pm-place">
+        <button type="button" id="pmLay" title="Then click a face of the model in the 3D view">Lay on face</button>
+        <button type="button" id="pmLayReset" title="Back to how the model was loaded" hidden>Reset orientation</button>
+      </div>
       </div>
       <div class="seg" role="radiogroup" aria-label="How the art goes on">
         <input type="radio" name="pmMode" id="pmFlat" value="flat" checked><label for="pmFlat">Straight on</label>
@@ -1530,7 +1534,7 @@ function setGen(g) {
   for (const k in GEN_BTN) $(GEN_BTN[k]).setAttribute('aria-selected', k === g);
   document.body.classList.toggle('gen-cookie', g === 'cookie');
   document.body.classList.toggle('gen-paint', g === 'paint'); $('pmOpts').hidden = g !== 'paint';
-  if (g !== 'paint') setPlacing(false);
+  if (g !== 'paint') { setPlacing(false); setLaying(false); }
   syncTextOnly();
   // Paint a model can start from the model (and text) alone, so its steps open before any image
   ['sText', 's5'].forEach(id => enable(id, g === 'paint' || !!(S.prep && S.prep.labels)));
@@ -1682,7 +1686,7 @@ async function loadModelFile(file) {
     const mesh = await C.loadMesh(file.name, new Uint8Array(await file.arrayBuffer()), inflateRaw);
     mesh.name = file.name.replace(/\.(stl|3mf)$/i, '').slice(0, 60) || 'Model';
     const fit = wrapFit(mesh); mesh.wrapR = fit.R; mesh.wrapAxis = fit.axis; mesh.round = fit.round;
-    S.modelOrig = mesh; S.model = null; S.pmClick = null;
+    S.modelOrig = mesh; S.modelLoaded = mesh; S.model = null; S.pmClick = null; $('pmLayReset').hidden = true;
     // until a model filament is chosen, show the model in a light neutral grey so any art color stands out on it
     if (!S.pmBaseChosen) { $('baseColor').value = '#c8c8c8'; S.baseSpool = null; $('baseSpool').textContent = ''; refreshSwatches(); }
     if ($('pmDir').value === 'click') $('pmDir').value = 'front';
@@ -1721,6 +1725,7 @@ $('pmView').addEventListener('click', () => {
 // the surface's own facing there; wrapped, the click sets how far round and how high the art sits.
 function setPlacing(on) {
   S.placing = !!on && !!S.model;
+  if (S.placing && S.laying) setLaying(false);
   $('pmPlace').classList.toggle('on', S.placing);
   $('pmPlace').textContent = S.placing ? 'Now click the model… (Esc to cancel)' : 'Click the model to place the art';
   document.body.classList.toggle('placing', S.placing);
@@ -1739,11 +1744,66 @@ function placeArtAt(hit) {
   }
   setPlacing(false); scheduleBuild();
 }
+// Lay on face, like the slicer's: the clicked face turns to point straight down and the model sits on the plate on it
+function setLaying(on) {
+  S.laying = !!on && !!S.model;
+  if (S.laying && S.placing) setPlacing(false);
+  $('pmLay').classList.toggle('on', S.laying);
+  $('pmLay').textContent = S.laying ? 'Now click a face… (Esc to cancel)' : 'Lay on face';
+  document.body.classList.toggle('placing', S.laying || !!S.placing);
+  if (S.laying) { setView('3d'); status('Click the face of the model that should sit flat on the plate.'); }
+  else if (/^Click the face/.test($('status').textContent)) status('');
+}
+// rotate the loaded mesh so direction n points straight down, then sit it on the plate, centred
+function orientMesh(src, n) {
+  const P = src.positions, Q = new Float32Array(P.length), t = [0, 0, -1];
+  let ax = n[1] * t[2] - n[2] * t[1], ay = n[2] * t[0] - n[0] * t[2], az = n[0] * t[1] - n[1] * t[0];
+  const sin = Math.hypot(ax, ay, az), cos = n[0] * t[0] + n[1] * t[1] + n[2] * t[2];
+  let R;
+  if (sin < 1e-9) R = cos > 0 ? [1, 0, 0, 0, 1, 0, 0, 0, 1] : [1, 0, 0, 0, -1, 0, 0, 0, -1]; // already down / flip over
+  else {
+    ax /= sin; ay /= sin; az /= sin; const C1 = 1 - cos;
+    R = [cos + ax * ax * C1, ax * ay * C1 - az * sin, ax * az * C1 + ay * sin,
+      ay * ax * C1 + az * sin, cos + ay * ay * C1, ay * az * C1 - ax * sin,
+      az * ax * C1 - ay * sin, az * ay * C1 + ax * sin, cos + az * az * C1];
+  }
+  const lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
+  for (let i = 0; i < P.length; i += 3) {
+    const x = P[i], y = P[i + 1], z = P[i + 2];
+    for (let k = 0; k < 3; k++) { const v = R[k * 3] * x + R[k * 3 + 1] * y + R[k * 3 + 2] * z; Q[i + k] = v; if (v < lo[k]) lo[k] = v; if (v > hi[k]) hi[k] = v; }
+  }
+  const cx = (lo[0] + hi[0]) / 2, cy = (lo[1] + hi[1]) / 2;
+  for (let i = 0; i < Q.length; i += 3) { Q[i] -= cx; Q[i + 1] -= cy; Q[i + 2] -= lo[2]; }
+  const out = { positions: Q, indices: src.indices, size: [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]], name: src.name };
+  const fit = wrapFit(out); out.wrapR = fit.R; out.wrapAxis = fit.axis; out.round = fit.round;
+  return out;
+}
+function setModelOrientation(mesh) {
+  S.modelOrig = mesh; S.model = null; S.pmClick = null;
+  if ($('pmDir').value === 'click') $('pmDir').value = 'front';
+  applyModelScale(false);
+  $('pmLayReset').hidden = mesh === S.modelLoaded;
+  if (mesh.round !== (pmMode() === 'wrap')) { $(mesh.round ? 'pmWrap' : 'pmFlat').checked = true; syncPmMode(); }
+  pmDefaults(); if (gl) gl.framed = false;
+  if (S.prep && S.prep.labels) scheduleBuild(); else showModelOnly();
+}
+function layOnFace(hit) {
+  const n = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : null;
+  setLaying(false);
+  if (!n) return;
+  // the scaled copy and the original only differ in size, so the face points the same way in both
+  setModelOrientation(orientMesh(S.modelOrig, [n.x, n.y, n.z]));
+}
+$('pmLay').addEventListener('click', () => {
+  if (!S.model) { status('Choose the model to paint first.'); return; }
+  setLaying(!S.laying);
+});
+$('pmLayReset').addEventListener('click', () => { if (S.modelLoaded) { setLaying(false); setModelOrientation(S.modelLoaded); } });
 $('pmPlace').addEventListener('click', () => {
   if (!S.model) { status('Choose the model to paint first.'); return; }
   setPlacing(!S.placing);
 });
-window.addEventListener('keydown', e => { if (e.key === 'Escape' && S.placing) setPlacing(false); });
+window.addEventListener('keydown', e => { if (e.key === 'Escape') { if (S.placing) setPlacing(false); if (S.laying) setLaying(false); } });
 $('pmScale').addEventListener('input', () => { if (!applyModelScale(true)) return; if (S.prep && S.prep.labels) scheduleBuild(); else showModelOnly(); });
 $('pmHmm').addEventListener('change', () => {
   const o = S.modelOrig, h = parseFloat($('pmHmm').value); if (!o || !(h > 0) || !(o.size[2] > 0)) return;
@@ -1995,6 +2055,7 @@ function pick3D(e) {
   const ndc = new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
   const ray = new THREE.Raycaster(); ray.setFromCamera(ndc, gl.camera);
   const hit = ray.intersectObjects(gl.group.children, false)[0];
+  if (S.laying) { if (hit && (hit.object.userData.id === 'base' || hit.object.userData.id === 'paint')) layOnFace(hit); return; }
   if (S.placing) { if (hit && (hit.object.userData.id === 'base' || hit.object.userData.id === 'paint')) placeArtAt(hit); return; }
   if (!hit) { closePop(); return; }
   const pt = hit.point.clone();

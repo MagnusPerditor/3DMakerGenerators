@@ -7,6 +7,7 @@
 - **Straight on** projects the art onto one side: front, back, left, right, top, or the direction the 3D view is facing.
 - **Wrap around** wraps the art round mugs, cups, cans and vases like a label. It fits the round body (ignoring handles and spouts) and is chosen automatically for round models.
 - Model scale (%) or an exact height, and the art keeps its place as the model grows or shrinks.
+- **Lay on face**, like the slicer's: press it and click a face in the 3D view, and the model turns so that face sits flat on the plate. *Reset orientation* puts it back as loaded.
 - Art width, position, rotation, turn around the model, the steepest surface to paint, and the finest detail.
 - Anything hidden behind another part of the model stays unpainted.
 - Drop an STL or 3MF on the image box and it opens in Paint a model.
