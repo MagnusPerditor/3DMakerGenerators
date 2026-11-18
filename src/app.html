@@ -1618,6 +1618,8 @@ function wrapFit(mesh) {
   // round when most of the wall area sits on the circle and the body is reasonably tall
   return { axis: [cx, cy], R, round: on > 0.45 && mesh.size[2] > 0.5 * R && use.length >= 8 };
 }
+// pixels of the picture itself (without the text around it); with text only, the text block
+function pmArtWidth(fallback) { return S.prep && !S.prep.textOnly ? S.prep.width : fallback.width; }
 function pmSet(id, v) { const el = $(id); el.value = Math.min(+el.max, Math.max(+el.min, v)); el.dispatchEvent(new Event('input')); }
 // a sensible art size for the chosen side: as big as fits with a little room around it
 function pmDefaults() {
@@ -1627,7 +1629,9 @@ function pmDefaults() {
   let fw, fh;
   if (pmMode() === 'wrap') { fw = Math.PI * S.model.wrapR * 0.7; fh = sz; }
   else { const d = $('pmDir').value; fw = d === 'left' || d === 'right' ? sy : sx; fh = d === 'top' ? sy : sz; if (d === 'view' || d === 'click') { fw = Math.max(sx, sy); fh = sz; } }
-  pmSet('pmW', Math.round(Math.min(fw * 0.8, fh * 0.8 * aspect) * 2) / 2);
+  // fit the whole thing (art and text) in the face, then express it as the picture's width
+  const whole = Math.min(fw * 0.8, fh * 0.8 * aspect), k = cmp ? pmArtWidth(cmp.prep) / cmp.W : 1;
+  pmSet('pmW', Math.max(1, Math.round(whole * k * 2) / 2));
   pmSet('pmX', 0); pmSet('pmY', 0);
 }
 function syncPmMode() {
@@ -1641,8 +1645,17 @@ function paintModel(art, cmp) {
   const keyFor = hex => { hex = hex.toLowerCase(); if (hex === base) return 0; if (!keyOf.has(hex)) { keyOf.set(hex, keyColors.length); keyColors.push(hex); } return keyOf.get(hex); };
   const stateOf = S.regions.map(r => { const e = effectiveRegion(r); return !e || e.flat ? 0 : keyFor(e.filament); });
   if (cmp) stateOf.push(keyFor(textFill()));
-  const mesh = S.model, sz = mesh.size, mmPerPx = +$('pmW').value / art.width;
-  const o = { art, stateOf, mmPerPx, offX: +$('pmX').value, offY: +$('pmY').value, rotation: +$('pmRot').value, maxAngle: +$('pmAngle').value, minEdge: +$('pmDetail').value, preview: true };
+  // the width is the picture's own width, so text added beside it never shrinks the art (text alone: the text's width)
+  const mesh = S.model, sz = mesh.size, mmPerPx = +$('pmW').value / pmArtWidth(art);
+  // the picture stays put when text is added or resized: aim the projection at the picture's centre, not at the
+  // middle of picture + text (the shift is turned with the art's rotation so it holds at any angle)
+  let offX = +$('pmX').value, offY = +$('pmY').value;
+  if (cmp && S.prep && !S.prep.textOnly) {
+    const ex = (cmp.ox + S.prep.width / 2 - cmp.W / 2) * mmPerPx, ey = (cmp.H / 2 - (cmp.oy + S.prep.height / 2)) * mmPerPx;
+    const r = +$('pmRot').value * Math.PI / 180, cr = Math.cos(r), sr = Math.sin(r);
+    offX -= ex * cr - ey * sr; offY -= ex * sr + ey * cr;
+  }
+  const o = { art, stateOf, mmPerPx, offX, offY, rotation: +$('pmRot').value, maxAngle: +$('pmAngle').value, minEdge: +$('pmDetail').value, preview: true };
   if (pmMode() === 'wrap') Object.assign(o, { kind: 'wrap', axis: mesh.wrapAxis, radius: mesh.wrapR, zc: sz[2] / 2, startDeg: +$('pmTurn').value });
   else Object.assign(o, { kind: 'flat', dir: pmDirVec(),
     // a clicked spot is the centre; otherwise a round body is centred on its own axis, not the handle
