@@ -14,7 +14,7 @@
 - Adding an image only adds the art's colors; the model keeps its own filament (light grey until you pick one).
 - Text added to the art never resizes or moves the picture: *Art width* is the picture's own width, and the picture stays centred where you put it while the text grows or shrinks beside it.
 - **Text only**: paint just a name or message (straight, or curved along the top or bottom) without any image. Set its size with the text width.
-- **Click to place**: press *Click the model to place the art*, then click the spot in the 3D view. Straight on, the art is painted facing that surface; wrapped, the click sets how far round and how high it sits.
+- **Click to place**: press *Click the model to place the art*, then click the spot in the 3D view. Straight on, the art is painted facing that surface, upright as the 3D view shows it, so *Move art up* and *sideways* follow the screen; wrapped, the click sets how far round and how high it sits.
 
 ### Other changes
 - One version number everywhere: the web app (shown next to the title), the OrcaSlicer plugin and the Windows app are all 2.0.0.

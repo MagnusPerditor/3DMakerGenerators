@@ -1337,7 +1337,10 @@
         faces: (p, n) => { const dx = p[0] - ax, dy = p[1] - ay, r = Math.hypot(dx, dy) || 1; return (n[0] * dx + n[1] * dy) / r >= cosLim; },
       };
     }
-    const d = o.dir, up0 = Math.abs(d[2]) > 0.9 ? [0, 1, 0] : [0, 0, 1];
+    // which way is "up" in the art: o.up when given (the 3D view's up when the art was placed by clicking or from
+    // the view, so the art reads upright as you saw it), else +Z, or +Y (towards the back) when painting from above
+    const d = o.dir, hint = o.up && Math.abs(o.up[0] * d[0] + o.up[1] * d[1] + o.up[2] * d[2]) < 0.95 ? o.up : null;
+    const up0 = hint || (Math.abs(d[2]) > 0.9 ? [0, 1, 0] : [0, 0, 1]);
     // right = up x (-d) ... built so the image reads normally when looking along d
     let rx = d[1] * up0[2] - d[2] * up0[1], ry = d[2] * up0[0] - d[0] * up0[2], rz = d[0] * up0[1] - d[1] * up0[0];
     const rl = Math.hypot(rx, ry, rz); rx /= rl; ry /= rl; rz /= rl;
