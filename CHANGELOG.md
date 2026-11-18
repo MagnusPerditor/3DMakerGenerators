@@ -17,6 +17,8 @@
 - **Click to place**: press *Click the model to place the art*, then click the spot in the 3D view. Straight on, the art is painted facing that surface, upright as the 3D view shows it, so *Move art up* and *sideways* follow the screen; wrapped, the click sets how far round and how high it sits.
 
 ### Other changes
+- Undo and redo cover *Lay on face* and *Click to place*.
+- OrcaSlicer plugin: the generator page is stored as plain, readable text instead of a compressed blob, and unused link-opening code is gone.
 - Text can now go to the **right** or **left** of the art, centred on its height, in every generator.
 - One version number everywhere: the web app (shown next to the title), the OrcaSlicer plugin and the Windows app are all 2.0.0.
 

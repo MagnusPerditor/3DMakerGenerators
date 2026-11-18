@@ -22,14 +22,13 @@ part its filament slot; it carries no printer or filament settings, so Orca keep
 
   page   --{cmd: 'hello'}-->            plugin   (replies {cmd: 'slots', slots, plate})
   page   --{cmd: 'send', name, b64}-->  plugin   (writes the 3MF, hands it to Orca, replies {cmd: 'sent'})
-  page   --{cmd: 'open', url}-->        plugin   (opens a link in the default browser)
+  page   --{cmd: 'reset'}-->            plugin   (replies {cmd: 'page', html}: a fresh copy of the page)
 """
 import base64
 import os
 import re
 import subprocess
 import sys
-import zlib
 
 import orca
 
@@ -38,14 +37,16 @@ PLUGIN_DIR_NAME = "maker-generators"
 KEEP_SENT_FILES = 12
 MAX_MODEL_BYTES = 300 * 1024 * 1024
 
-# The generator page: one self-contained HTML file (three.js and fonts inlined), zlib + base64.
-_PAGE_Z = (
+# The generator page: one self-contained HTML file, stored as plain text so it can be read and reviewed.
+# It is the web app from the project's src/ folder with three.js (MIT) and the Google Fonts it uses
+# (SIL Open Font License) inlined, so the plugin works offline. Built by tools/build.py.
+_PAGE = (
 __PAGE_DATA__
 )
 
 
 def page_html():
-    return zlib.decompress(base64.b64decode("".join(_PAGE_Z))).decode("utf-8")
+    return "".join(_PAGE)
 
 
 # ---------------------------------------------------------------- Orca state for the page
@@ -294,11 +295,6 @@ def handle_message(post, message):
         post({"cmd": "page", "html": page_html()})
     elif command == "send":
         send_model(post, message)
-    elif command == "open":
-        url = str(message.get("url") or "")
-        if re.match(r"^https://", url):
-            import webbrowser
-            webbrowser.open(url)
 
 
 # ---------------------------------------------------------------- the tab in Orca's top bar

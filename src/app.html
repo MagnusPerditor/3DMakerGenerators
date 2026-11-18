@@ -1899,8 +1899,11 @@ function takeSnapshot() {
     prep: p, labels, labelsId, gen: S.gen, mirror: S.mirror,
     regions: S.regions.map(r => ({ ...r })), stats: S.stats,
     baseColor: $('baseColor').value, baseSpool: S.baseSpool || null, controls: controlState(), rimCustom: { ...S.rimCustom }, textC: { ...S.textC },
+    // Paint a model: which way the model lies and where the art was clicked into place, so undo covers those too
+    paint: S.modelOrig ? { orig: S.modelOrig, click: S.pmClick ? JSON.parse(JSON.stringify(S.pmClick)) : null, viewDir: S.pmViewDir, viewUp: S.pmViewUp || null } : null,
   };
-  snap.key = JSON.stringify([snap.gen, snap.mirror, snap.regions.map(r => [r.name, r.filament, r.height, r.merge, r.pixels, r.spool && spoolKey(r.spool), r.stamp]), snap.baseColor, snap.baseSpool && spoolKey(snap.baseSpool), snap.controls, Object.values(snap.rimCustom).map(c => c && [c.color, c.spool && spoolKey(c.spool)]), [snap.textC.color, snap.textC.spool && spoolKey(snap.textC.spool)]]) + '|' + labelsId;
+  if (snap.paint && !snap.paint.orig.uid) snap.paint.orig.uid = ++H.seq;
+  snap.key = JSON.stringify([snap.gen, snap.mirror, snap.regions.map(r => [r.name, r.filament, r.height, r.merge, r.pixels, r.spool && spoolKey(r.spool), r.stamp]), snap.baseColor, snap.baseSpool && spoolKey(snap.baseSpool), snap.controls, Object.values(snap.rimCustom).map(c => c && [c.color, c.spool && spoolKey(c.spool)]), [snap.textC.color, snap.textC.spool && spoolKey(snap.textC.spool)], snap.paint && [snap.paint.orig.uid, snap.paint.click, snap.paint.viewDir, snap.paint.viewUp]]) + '|' + labelsId;
   return snap;
 }
 function recordState() {
@@ -1937,6 +1940,15 @@ function restoreSnapshot(s) {
     }
     renderRegions(); renderRimOptions();
     for (const [el, v] of selects) if ([...el.options].some(o => o.value === v)) el.value = v;
+    if (s.paint) {
+      // rebuild the model at the restored scale from the restored orientation (S.model = null so nothing is rescaled twice)
+      const turned = S.modelOrig !== s.paint.orig, keepView = !!(gl && gl.framed && !turned);
+      S.modelOrig = s.paint.orig; S.model = null;
+      S.pmClick = s.paint.click ? JSON.parse(JSON.stringify(s.paint.click)) : null; S.pmViewDir = s.paint.viewDir; S.pmViewUp = s.paint.viewUp;
+      applyModelScale(false); if (keepView) gl.framed = true; // only re-aim the camera when the model turned
+      $('pmLayReset').hidden = S.modelOrig === S.modelLoaded;
+      setPlacing(false); setLaying(false); syncPmMode();
+    }
     syncRimField(); $('imgHField').hidden = !$('uniformH').checked; $('fFields').hidden = !$('fOn').checked; $('ckStampFields').hidden = !$('ckStamp').checked; syncCoinMode(); syncKcShape(); syncTextUI(); syncTextFil();
     if (typeof syncSize === 'function' && S.gen === 'tray') syncSize();
     drawThumbs(); drawPreview(); renderPaintSwatches();
@@ -2770,10 +2782,6 @@ if (ORCA) {
   const syncTheme = () => { const t = root.getAttribute('data-orca-theme'); if (t === 'dark' || t === 'light') root.dataset.theme = t; };
   syncTheme(); new MutationObserver(syncTheme).observe(root, { attributes: true, attributeFilter: ['data-orca-theme'] });
   root.style.setProperty('--focus', 'var(--orca-accent, #009688)');
-  document.addEventListener('click', e => {
-    const a = e.target.closest && e.target.closest('a[target=_blank]'); if (!a) return;
-    e.preventDefault(); window.orca.postMessage({ cmd: 'open', url: a.href });
-  });
   const askSlots = () => { if (alive()) window.orca.postMessage({ cmd: 'hello' }); };
   $('slotRefresh').addEventListener('click', askSlots);
   // Reset: the plugin sends a fresh copy of this page, which replaces the document in place.
