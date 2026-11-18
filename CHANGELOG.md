@@ -10,6 +10,7 @@
 - Art width, position, rotation, turn around the model, the steepest surface to paint, and the finest detail.
 - Anything hidden behind another part of the model stays unpainted.
 - Drop an STL or 3MF on the image box and it opens in Paint a model.
+- Adding an image only adds the art's colors; the model keeps its own filament (light grey until you pick one).
 - **Text only**: paint just a name or message (straight, or curved along the top or bottom) without any image. Set its size with the text width.
 - **Click to place**: press *Click the model to place the art*, then click the spot in the 3D view. Straight on, the art is painted facing that surface; wrapped, the click sets how far round and how high it sits.
 

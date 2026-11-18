@@ -1097,7 +1097,9 @@ async function runColors(resetRegions) {
       if (prev) return { ...prev, pixels: s.pixels };
       return { source: s.color, name: colorName(s.color), filament: s.color, height: 3, merge: -1, pixels: s.pixels };
     });
-    if (resetRegions) { $('baseColor').value = S.stats[0] ? S.stats[0].color : '#1a1a1a'; S.baseSpool = null; $('baseSpool').textContent = ''; }
+    // a new image sets the base to its darkest color, except in Paint a model: there the base is the model's own
+    // filament, and the image only adds the art's colors on top of it
+    if (resetRegions && S.gen !== 'paint') { $('baseColor').value = S.stats[0] ? S.stats[0].color : '#1a1a1a'; S.baseSpool = null; $('baseSpool').textContent = ''; }
   });
   renderRegions(); renderRimOptions(); drawPreview(); scheduleBuild();
 }
@@ -1185,7 +1187,7 @@ function renderTally() {
   t.className = 'tally' + (f.length > 4 ? ' warn' : '');
   t.innerHTML = `<span class="dots">${f.map(c => `<i style="background:${c}" title="${escapeHtml(spoolForHex(c))}"></i>`).join('')}</span><span>${f.length} filament${f.length === 1 ? '' : 's'}${f.length > 4 ? '. That is more than a 4-tool printer holds, so merge regions or plan swaps.' : ''}</span>`;
 }
-$('baseColor').addEventListener('input', () => { S.baseSpool = S.pickedSpool || null; $('baseSpool').textContent = S.baseSpool ? '· ' + spoolLabel(S.baseSpool) : ''; refreshSwatches(); drawPreview(); scheduleBuild(); });
+$('baseColor').addEventListener('input', () => { if (S.gen === 'paint') S.pmBaseChosen = true; S.baseSpool = S.pickedSpool || null; $('baseSpool').textContent = S.baseSpool ? '· ' + spoolLabel(S.baseSpool) : ''; refreshSwatches(); drawPreview(); scheduleBuild(); });
 
 // ---------- rim / border wall filament (may be a filament no art region uses) ----------
 const freshRimCustom = () => ({ tray: null, coin: null, keychain: null, magnet: null, coaster: null, bookmark: null, cookie: null, flat: null, dust: null, paint: null, coasterRim: null, filler: null });
@@ -1681,6 +1683,8 @@ async function loadModelFile(file) {
     mesh.name = file.name.replace(/\.(stl|3mf)$/i, '').slice(0, 60) || 'Model';
     const fit = wrapFit(mesh); mesh.wrapR = fit.R; mesh.wrapAxis = fit.axis; mesh.round = fit.round;
     S.modelOrig = mesh; S.model = null; S.pmClick = null;
+    // until a model filament is chosen, show the model in a light neutral grey so any art color stands out on it
+    if (!S.pmBaseChosen) { $('baseColor').value = '#c8c8c8'; S.baseSpool = null; $('baseSpool').textContent = ''; refreshSwatches(); }
     if ($('pmDir').value === 'click') $('pmDir').value = 'front';
     if (!S.img) { S.name = mesh.name.replace(/[^\w-]+/g, '_'); $('fileName').value = S.name + GEN.paint.suffix; }
     $('pmScale').value = 100; $('pmScale').dispatchEvent(new Event('input'));
