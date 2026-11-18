@@ -376,7 +376,7 @@ input[type=color]:not([data-native]) { cursor: pointer; }
       </div>
       <div class="field">
         <label for="tPos">Position</label>
-        <select id="tPos"><option value="below">Below the art</option><option value="above">Above the art</option><option value="over">On the art</option><option value="arc-bottom">Curved along the bottom</option><option value="arc-top">Curved along the top</option></select>
+        <select id="tPos"><option value="below">Below the art</option><option value="above">Above the art</option><option value="right">Right of the art</option><option value="left">Left of the art</option><option value="over">On the art</option><option value="arc-bottom">Curved along the bottom</option><option value="arc-top">Curved along the top</option></select>
       </div>
       <div class="field" id="tSizeField">
         <label for="tSize">Letter size</label><span class="num"><input type="number" id="tSizeNum" min="6" max="40" step="1" value="16" inputmode="decimal" aria-label="Letter size"><span>%</span></span>
@@ -2158,12 +2158,17 @@ function makeComposite(art, TL, symmetric) {
   const Wt = Math.max(1, ...use.map(lineW)), Ht = use.length * (A + D) + (use.length - 1) * lg;
   let W, H, ox, oy, draw;
   if (!arc) {
-    const tw = Math.ceil(Wt) + 2 * pad, th = Math.ceil(Ht) + 2 * pad;
+    const tw = Math.ceil(Wt) + 2 * pad, th = Math.ceil(Ht) + 2 * pad, side = pos === 'right' || pos === 'left';
+    let tx = 0;
     if (pos === 'over') { W = Math.max(aw, tw); H = Math.max(ah, th); ox = (W - aw) >> 1; oy = (H - ah) >> 1; }
+    else if (side) { // beside the art, centred on its height; lines line up on the side that faces the art
+      W = aw + gap + tw; H = Math.max(ah, th); oy = (H - ah) >> 1;
+      ox = pos === 'right' ? 0 : tw + gap; tx = pos === 'right' ? aw + gap : 0;
+    }
     else { W = Math.max(aw, tw); H = ah + gap + th; ox = (W - aw) >> 1; oy = pos === 'above' ? gap + th : 0; }
-    const ty = pos === 'over' ? (H - th) / 2 : pos === 'above' ? 0 : ah + gap;
+    const ty = pos === 'over' || side ? (H - th) / 2 : pos === 'above' ? 0 : ah + gap;
     draw = c => use.forEach((s, li) => {
-      let x = (W - lineW(s)) / 2; const y = ty + pad + A + li * (A + D + lg);
+      let x = pos === 'right' ? tx + pad : pos === 'left' ? tx + tw - pad - lineW(s) : (W - lineW(s)) / 2; const y = ty + pad + A + li * (A + D + lg);
       for (const ch of s) { c.fillText(ch, x, y); x += c.measureText(ch).width + sp; }
     });
   } else {
@@ -2241,8 +2246,8 @@ function syncTextUI() {
   $('tOpts').hidden = !$('tText').value.trim();
   // text with no image: its size is set by the width on the model, and there is no art to keep a gap from
   const only = !!(S.prep && S.prep.textOnly);
-  $('tSizeField').hidden = only; $('tPos').querySelector('option[value=over]').hidden = only;
-  if (only && $('tPos').value === 'over') $('tPos').value = 'below';
+  $('tSizeField').hidden = only; ['over', 'right', 'left'].forEach(v => $('tPos').querySelector(`option[value=${v}]`).hidden = only);
+  if (only && ['over', 'right', 'left'].includes($('tPos').value)) $('tPos').value = 'below';
   $('pmWField').querySelector('label').textContent = only ? 'Text width' : 'Art width';
   $('tGapField').hidden = $('tPos').value === 'over' || only;
   $('tHField').hidden = !raisedArt() || uniform();
