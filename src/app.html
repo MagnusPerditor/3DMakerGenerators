@@ -83,6 +83,19 @@ h1 { font: 700 30px/1.05 var(--display); letter-spacing: -0.02em; margin: 0 0 6p
 .drop { display: grid; place-items: center; text-align: center; gap: 4px; padding: 22px 16px; border: 1.5px dashed var(--line); border-radius: 10px; cursor: pointer; transition: border-color .15s, background .15s; }
 .drop:hover, .drop.over { border-color: var(--brass); background: color-mix(in srgb, var(--brass) 7%, transparent); }
 .drop strong { font-weight: 600; }
+h1 .ver { font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing: 0; vertical-align: middle; }
+#pmDrop { margin-bottom: 12px; padding: 16px 14px; }
+#pmDrop.loaded { border-style: solid; }
+.pm-place { display: flex; gap: 8px; flex-wrap: wrap; margin: -2px 0 12px; }
+.pm-place button { border: 1px solid var(--line); background: var(--paper); color: var(--ink); border-radius: 6px; padding: 5px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+.pm-place button:hover { border-color: var(--brass); }
+#pmLay.on, #pmPlace.on { background: var(--brass); border-color: var(--brass); color: #fff; }
+body.placing #view3d canvas, body.placing canvas { cursor: crosshair; }
+.pm-size { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: -4px 0 6px; font-size: 13.5px; }
+.pm-size label { font-weight: 500; }
+.pm-size .num input { width: 76px; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
+#pmSizeTxt { color: var(--muted); }
+body.gen-paint #dl3mf, body.gen-paint #dlZip, body.gen-paint #dlStl, body.gen-paint #uniformH, body.gen-paint label:has(> #uniformH), body.gen-paint #imgHField, body.gen-paint #smoothField, body.gen-paint #smoothField + .hint { display: none; }
 .drop span { color: var(--muted); font-size: 13.5px; }
 
 .field { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 12px; margin: 12px 0; }
@@ -283,7 +296,7 @@ input[type=color]:not([data-native]) { cursor: pointer; }
 <body>
 <div class="app">
   <aside class="panel">
-    <h1>3D Maker Generators</h1>
+    <h1>3D Maker Generators <span class="ver">v__APP_VERSION__</span></h1>
     <p class="lede" id="lede">Turn flat character art into printable models, one filament per color.</p>
     <div class="gens" role="tablist" aria-label="Generator">
       <button type="button" role="tab" id="genTray" aria-selected="true"><b>Trinket tray</b><small>Outline-shaped dish</small></button>
@@ -295,6 +308,7 @@ input[type=color]:not([data-native]) { cursor: pointer; }
       <button type="button" role="tab" id="genCookie" aria-selected="false"><b>Cookie cutter</b><small>Cutter + stamp</small></button>
       <button type="button" role="tab" id="genFlat" aria-selected="false"><b>Flat model</b><small>Just the art, face down</small></button>
       <button type="button" role="tab" id="genDust" aria-selected="false"><b>Dust cover</b><small>Joystick disc, face down</small></button>
+      <button type="button" role="tab" id="genPaint" aria-selected="false"><b>Paint a model</b><small>Art onto your STL or 3MF</small></button>
     </div>
     <p class="extlink"><a href="https://quikclicks.app/" target="_blank" rel="noopener noreferrer">Clicker maker <span aria-hidden="true">↗</span><span class="sr">(opens QuikClicks in a new tab)</span></a><a href="https://app.printhq.io/" target="_blank" rel="noopener noreferrer">PrintHQ Vault <span aria-hidden="true">↗</span><span class="sr">(opens in a new tab)</span></a></p>
 
@@ -346,7 +360,7 @@ input[type=color]:not([data-native]) { cursor: pointer; }
       <div class="regions" id="regions"></div>
       <div class="base-row" id="baseRow" title="Click to highlight the base on the model">
         <span class="chip"><input type="color" id="baseColor" value="#1a1a1a" aria-label="Base filament color"></span>
-        <span><b>Base</b> filament <span class="spool" id="baseSpool"></span></span>
+        <span><b id="baseWord">Base</b> filament <span class="spool" id="baseSpool"></span></span>
       </div>
       <div class="tally" id="tally"></div>
     </section>
@@ -362,7 +376,7 @@ input[type=color]:not([data-native]) { cursor: pointer; }
       </div>
       <div class="field">
         <label for="tPos">Position</label>
-        <select id="tPos"><option value="below">Below the art</option><option value="above">Above the art</option><option value="over">On the art</option><option value="arc-bottom">Curved along the bottom</option><option value="arc-top">Curved along the top</option></select>
+        <select id="tPos"><option value="below">Below the art</option><option value="above">Above the art</option><option value="right">Right of the art</option><option value="left">Left of the art</option><option value="over">On the art</option><option value="arc-bottom">Curved along the bottom</option><option value="arc-top">Curved along the top</option></select>
       </div>
       <div class="field" id="tSizeField">
         <label for="tSize">Letter size</label><span class="num"><input type="number" id="tSizeNum" min="6" max="40" step="1" value="16" inputmode="decimal" aria-label="Letter size"><span>%</span></span>
@@ -713,7 +727,68 @@ input[type=color]:not([data-native]) { cursor: pointer; }
       </div>
       </div>
       </div>
-      <div class="field">
+      <div id="pmOpts" hidden>
+      <label class="drop" id="pmDrop" tabindex="0">
+        <strong id="pmTitle">Choose the model to paint</strong>
+        <span id="pmInfo">STL or 3MF. Its shape is not changed; the art is painted onto the surface like Orca's color painting tool.</span>
+        <input type="file" id="pmFile" accept=".stl,.3mf,model/stl,model/3mf" hidden>
+      </label>
+      <div id="pmScaleBox" hidden>
+      <div class="field" id="pmScaleField">
+        <label for="pmScale">Model scale</label><span class="num"><input type="number" id="pmScaleNum" min="5" max="1000" step="0.1" value="100" inputmode="decimal" aria-label="Model scale"><span>%</span></span>
+        <input type="range" id="pmScale" min="5" max="1000" step="0.1" value="100">
+      </div>
+      <div class="pm-size"><label for="pmHmm">Height</label><span class="num"><input type="number" id="pmHmm" min="1" max="1000" step="0.1" value="0" inputmode="decimal" aria-label="Model height"><span>mm</span></span><span id="pmSizeTxt"></span></div>
+      <p class="hint">Scales the whole model evenly. The art keeps its place on it, growing and shrinking with the model.</p>
+      <div class="pm-place">
+        <button type="button" id="pmLay" title="Then click a face of the model in the 3D view">Lay on face</button>
+        <button type="button" id="pmLayReset" title="Back to how the model was loaded" hidden>Reset orientation</button>
+      </div>
+      </div>
+      <div class="seg" role="radiogroup" aria-label="How the art goes on">
+        <input type="radio" name="pmMode" id="pmFlat" value="flat" checked><label for="pmFlat">Straight on</label>
+        <input type="radio" name="pmMode" id="pmWrap" value="wrap"><label for="pmWrap">Wrap around</label>
+      </div>
+      <p class="hint" id="pmModeHint">Projects the art straight onto one side, like a slide projector. Best for flat and gently curved faces.</p>
+      <div class="field" id="pmDirField">
+        <label for="pmDir">Paint from</label>
+        <select id="pmDir"><option value="front">Front</option><option value="back">Back</option><option value="left">Left</option><option value="right">Right</option><option value="top">Top</option><option value="view">Current 3D view</option><option value="click">Where I clicked</option></select>
+      </div>
+      <div class="pm-place">
+        <button type="button" id="pmPlace" title="Then click the spot on the model in the 3D view">Click the model to place the art</button>
+        <button type="button" id="pmView" title="Paint from the direction the 3D view is looking">Use 3D view</button>
+      </div>
+      <div class="field" id="pmWField">
+        <label for="pmW">Art width</label><span class="num"><input type="number" id="pmWNum" min="5" max="400" step="0.5" value="60" inputmode="decimal" aria-label="Art width"><span>mm</span></span>
+        <input type="range" id="pmW" min="5" max="400" step="0.5" value="60">
+      </div>
+      <div class="field" id="pmXField">
+        <label for="pmX">Move art sideways</label><span class="num"><input type="number" id="pmXNum" min="-200" max="200" step="0.5" value="0" inputmode="decimal" aria-label="Move art sideways"><span>mm</span></span>
+        <input type="range" id="pmX" min="-200" max="200" step="0.5" value="0">
+      </div>
+      <div class="field" id="pmYField">
+        <label for="pmY">Move art up</label><span class="num"><input type="number" id="pmYNum" min="-200" max="200" step="0.5" value="0" inputmode="decimal" aria-label="Move art up"><span>mm</span></span>
+        <input type="range" id="pmY" min="-200" max="200" step="0.5" value="0">
+      </div>
+      <div class="field" id="pmRotField">
+        <label for="pmRot">Rotate art</label><span class="num"><input type="number" id="pmRotNum" min="-180" max="180" step="1" value="0" inputmode="decimal" aria-label="Rotate art"><span>°</span></span>
+        <input type="range" id="pmRot" min="-180" max="180" step="1" value="0">
+      </div>
+      <div class="field" id="pmTurnField">
+        <label for="pmTurn">Turn around the model</label><span class="num"><input type="number" id="pmTurnNum" min="-180" max="180" step="1" value="0" inputmode="decimal" aria-label="Turn around the model"><span>°</span></span>
+        <input type="range" id="pmTurn" min="-180" max="180" step="1" value="0">
+      </div>
+      <div class="field" id="pmAngleField">
+        <label for="pmAngle">Paint surfaces up to</label><span class="num"><input type="number" id="pmAngleNum" min="30" max="89" step="1" value="75" inputmode="decimal" aria-label="Paint surfaces up to"><span>°</span></span>
+        <input type="range" id="pmAngle" min="30" max="89" step="1" value="75">
+      </div>
+      <div class="field" id="pmDetailField">
+        <label for="pmDetail">Finest detail</label><span class="num"><input type="number" id="pmDetailNum" min="0.1" max="1" step="0.05" value="0.2" inputmode="decimal" aria-label="Finest detail"><span>mm</span></span>
+        <input type="range" id="pmDetail" min="0.1" max="1" step="0.05" value="0.2">
+      </div>
+      <p class="hint">Surfaces turned further than the angle above from the art's direction stay unpainted, and so does anything hidden behind another part. Finer detail makes bigger files and takes longer to paint.</p>
+      </div>
+      <div class="field" id="smoothField">
         <label for="smooth">Smooth edges</label><span class="num"><input type="number" id="smoothNum" min="0" max="1" step="0.05" value="0.35" inputmode="decimal" aria-label="Smooth edges"><span>mm</span></span>
         <input type="range" id="smooth" min="0" max="1" step="0.05" value="0.35">
       </div>
@@ -851,6 +926,22 @@ function colorName(hex) {
   return tone + n.toLowerCase().replace(/^./, c => tone ? c : c.toUpperCase());
 }
 
+// Real images often have several shades that get the same name ("Blue", "Blue"). Tell them apart
+// by how light each is compared with the others of that name.
+function shadeNames(hexes, names) {
+  names = names ? names.slice() : hexes.map(colorName);
+  const lum = h => { const [r, g, b] = hexToRgb(h); return 0.299 * r + 0.587 * g + 0.114 * b; };
+  const groups = new Map();
+  names.forEach((n, i) => { if (!groups.has(n)) groups.set(n, []); groups.get(n).push(i); });
+  for (const [n, idx] of groups) {
+    if (idx.length < 2) continue;
+    idx.sort((a, b) => lum(hexes[a]) - lum(hexes[b]));
+    const tags = idx.length === 2 ? ['darker', 'lighter'] : idx.length === 3 ? ['darkest', 'middle', 'lightest'] : null;
+    idx.forEach((i, k) => { names[i] = tags ? `${n} (${tags[k]})` : `${n} ${k + 1}` + (k === 0 ? ' (darkest)' : k === idx.length - 1 ? ' (lightest)' : ''); });
+  }
+  return names;
+}
+
 // ---------- 1. load ----------
 // After a smooth enlargement, edge pixels are blends of two colors, which would show up as extra
 // halo colors. Give each pixel the closest of the original pixels around it instead: the color
@@ -887,9 +978,10 @@ function unblend(big, im) {
   return big;
 }
 function loadFile(file) {
+  if (file && /\.(stl|3mf)$/i.test(file.name || '')) { loadModelFile(file); return; } // a model dropped here goes to Paint a model
   if (!file || !file.type.startsWith('image/')) { setErr('That file is not an image. Choose a PNG, JPG or SVG.'); return; }
   const isSvg = file.type === 'image/svg+xml' || /\.svg$/i.test(file.name || '');
-  setErr('');
+  setErr(''); S.pmNeedsFit = !!S.model;
   S.name = (file.name || 'tray').replace(/\.[^.]+$/, '').replace(/[^\w-]+/g, '_').slice(0, 60) || 'tray';
   $('fileName').value = S.name + GEN[S.gen].suffix;
   const im = new Image();
@@ -944,6 +1036,7 @@ async function runBackground() {
   });
   if (!S.prep) { status(''); return; }
   ['s2', 's3', 's4', 'sText', 's5'].forEach(id => enable(id, true));
+  CMP = null; syncTextUI();
   $('clickHint').hidden = false;
   drawThumbs();
   await runColors(true);
@@ -1022,9 +1115,14 @@ async function runColors(resetRegions) {
       // keep a user's choices when the detected color barely moved
       const prev = !resetRegions && old.find(o => o.source === s.color);
       if (prev) return { ...prev, pixels: s.pixels };
-      return { source: s.color, name: colorName(s.color), filament: s.color, height: 3, merge: -1, pixels: s.pixels };
+      return { source: s.color, name: colorName(s.color), filament: s.color, height: 3, merge: -1, pixels: s.pixels, autoName: true };
     });
-    if (resetRegions) { $('baseColor').value = S.stats[0] ? S.stats[0].color : '#1a1a1a'; S.baseSpool = null; $('baseSpool').textContent = ''; }
+    // give same-named shades distinct names (only names the user hasn't typed)
+    const auto = S.regions.filter(r => r.autoName);
+    shadeNames(auto.map(r => r.source)).forEach((n, i) => { auto[i].name = n; });
+    // a new image sets the base to its darkest color, except in Paint a model: there the base is the model's own
+    // filament, and the image only adds the art's colors on top of it
+    if (resetRegions && S.gen !== 'paint') { $('baseColor').value = S.stats[0] ? S.stats[0].color : '#1a1a1a'; S.baseSpool = null; $('baseSpool').textContent = ''; }
   });
   renderRegions(); renderRimOptions(); drawPreview(); scheduleBuild();
 }
@@ -1055,7 +1153,7 @@ function renderRegions() {
     const el = document.createElement('div');
     el.dataset.i = i;
     el.className = 'region' + (r.merge !== -1 ? ' merged' : '') + (S.sel && S.sel.label === i ? ' active' : '');
-    const opts = ['<option value="-1">Own filament</option>', '<option value="-2">Leave flat (base)</option>']
+    const opts = ['<option value="-1">Own filament</option>', S.gen === 'paint' ? '<option value="-2">Model filament (unpainted)</option>' : '<option value="-2">Leave flat (base)</option>']
         .concat(S.regions.map((o, j) => j === i || !(o.pixels > 0) ? '' : `<option value="${j}">Same as ${escapeHtml(o.name)}</option>`)).join('');
     el.innerHTML = `
       <span class="chip"><input type="color" value="${r.filament}" aria-label="Filament color for ${escapeHtml(r.name)}"></span>
@@ -1074,7 +1172,7 @@ function renderRegions() {
     if (!own) { const e = effectiveRegion(r); colorIn.value = e.flat ? $('baseColor').value : e.filament; }
     colorIn.addEventListener('input', () => { r.filament = colorIn.value; r.spool = S.pickedSpool || null; refreshSwatches(); drawPreview(); scheduleBuild(); });
     colorIn.addEventListener('change', () => renderRegions());
-    nameIn.addEventListener('change', () => { r.name = nameIn.value.trim() || colorName(r.source); renderRegions(); renderRimOptions(); recordState(); });
+    nameIn.addEventListener('change', () => { r.name = nameIn.value.trim() || colorName(r.source); r.autoName = false; renderRegions(); renderRimOptions(); recordState(); });
     sel.addEventListener('change', () => { r.merge = +sel.value; renderRegions(); renderRimOptions(); drawPreview(); scheduleBuild(); });
     hIn.addEventListener('change', () => { r.height = Math.max(0.2, Math.min(20, +hIn.value || 1)); hIn.value = r.height; scheduleBuild(); });
     const sp = r.merge === -1 ? r.spool : (effectiveRegion(r).flat ? S.baseSpool : effectiveRegion(r).spool);
@@ -1112,13 +1210,13 @@ function renderTally() {
   t.className = 'tally' + (f.length > 4 ? ' warn' : '');
   t.innerHTML = `<span class="dots">${f.map(c => `<i style="background:${c}" title="${escapeHtml(spoolForHex(c))}"></i>`).join('')}</span><span>${f.length} filament${f.length === 1 ? '' : 's'}${f.length > 4 ? '. That is more than a 4-tool printer holds, so merge regions or plan swaps.' : ''}</span>`;
 }
-$('baseColor').addEventListener('input', () => { S.baseSpool = S.pickedSpool || null; $('baseSpool').textContent = S.baseSpool ? '· ' + spoolLabel(S.baseSpool) : ''; refreshSwatches(); drawPreview(); scheduleBuild(); });
+$('baseColor').addEventListener('input', () => { if (S.gen === 'paint') S.pmBaseChosen = true; S.baseSpool = S.pickedSpool || null; $('baseSpool').textContent = S.baseSpool ? '· ' + spoolLabel(S.baseSpool) : ''; refreshSwatches(); drawPreview(); scheduleBuild(); });
 
 // ---------- rim / border wall filament (may be a filament no art region uses) ----------
-const freshRimCustom = () => ({ tray: null, coin: null, keychain: null, magnet: null, coaster: null, bookmark: null, cookie: null, flat: null, dust: null, coasterRim: null, filler: null });
+const freshRimCustom = () => ({ tray: null, coin: null, keychain: null, magnet: null, coaster: null, bookmark: null, cookie: null, flat: null, dust: null, paint: null, coasterRim: null, filler: null });
 S.rimCustom = freshRimCustom();
 // one filament slot per rim-like part; keychain, magnet and coaster share the surround/face selector
-const RIM_SEL = { tray: 'rimStyle', coin: 'cRimFil', keychain: 'kRimFil', magnet: 'kRimFil', coaster: 'kRimFil', bookmark: 'kRimFil', cookie: 'kRimFil', flat: 'kRimFil', dust: 'kRimFil', coasterRim: 'qRimFil', filler: 'fFil' };
+const RIM_SEL = { tray: 'rimStyle', coin: 'cRimFil', keychain: 'kRimFil', magnet: 'kRimFil', coaster: 'kRimFil', bookmark: 'kRimFil', cookie: 'kRimFil', flat: 'kRimFil', dust: 'kRimFil', paint: 'kRimFil', coasterRim: 'qRimFil', filler: 'fFil' };
 function rimCustomLabel(g) { const c = S.rimCustom[g]; return c.spool ? spoolLabel(c.spool) : 'Custom ' + colorName(c.color).toLowerCase(); }
 const rimSelect = () => $(RIM_SEL[S.gen]);
 function rimFill(g) {
@@ -1237,6 +1335,7 @@ function artMmPerPx() {
     return artR / p._rad;
   }
   if (S.gen === 'cookie') return +$('ckSize').value / Math.max(p.width, p.height);
+  if (S.gen === 'paint') return +$('pmW').value / p.width;
   if (S.gen === 'bookmark') { const m = 2 * +$('kMargin').value; return Math.max(0.01, Math.min((+$('bWid').value - m) / p.width, (+$('bLen').value - m) / p.height)) * +$('kScale').value / 100; }
   if (FLAT.has(S.gen)) return Math.max(1, +$('kSize').value - 2 * (+$('kMargin').value + (S.gen === 'coaster' ? +$('qRimW').value : 0))) / Math.max(p.width, p.height) * (kcShape() === 'outline' ? 1 : 0.8 * +$('kScale').value / 100);
   return subjectHeightMM() / p.height;
@@ -1272,6 +1371,21 @@ async function build() {
       const tv = $('tFil').value;
       if (tv === '-1') { layerOf.push(TEXT_ID); layers.push({ id: TEXT_ID, height: textHeight() }); }
       else { const j = resolve(+tv); layerOf.push(j === -2 ? -1 : j); }
+    }
+    if (S.gen === 'paint') {
+      if (!S.model) { status('Choose the model to paint (STL or 3MF) under Paint a model.'); return; }
+      applyModelScale(false);
+      if (S.pmNeedsFit) { S.pmNeedsFit = false; pmDefaults(); clearTimeout(S.buildTimer); } // size the art to the model once both are in
+      status('Painting the model…'); await later(() => {});
+      if (token !== S.buildToken) return;
+      const res = paintModel(bprep, cmp);
+      if (token !== S.buildToken) return;
+      S.tray = res; showTray(res); textSizeReadout(res.mmPerPx);
+      const m = S.model.size;
+      $('dims').textContent = `${m[0].toFixed(1)} × ${m[1].toFixed(1)} × ${m[2].toFixed(1)} mm · ${res.painted.toLocaleString()} of ${(S.model.indices.length / 3).toLocaleString()} triangles painted`;
+      ['dl3mf', 'dlOrca', 'dlZip', 'dlStl', 'sendOrca'].forEach(id => $(id).disabled = false);
+      renderSlots();
+      status(res.painted ? '' : 'Nothing got painted. Check the direction, size and position of the art, or raise the surface angle.'); recordState(); return;
     }
     if (S.gen === 'cookie') {
       if (cmp) layerOf[layerOf.length - 1] = TEXT_ID; // text always stands up on the stamp
@@ -1354,7 +1468,7 @@ function partList() {
   const sp = s => s ? ' - ' + spoolLabel(s) : '';
   return S.tray.parts.map(p => {
     const g = { id: p.id, mesh: p.mesh, shapes: p.shapes, top: p.top };
-    if (p.id === 'base') return { ...g, name: (S.gen === 'cookie' ? 'Cutter' : 'Base') + sp(S.baseSpool), color: $('baseColor').value };
+    if (p.id === 'base') return { ...g, name: (S.gen === 'cookie' ? 'Cutter' : S.gen === 'paint' ? (S.model ? S.model.name : 'Model') : 'Base') + sp(S.baseSpool), color: $('baseColor').value };
     if (p.id === STAMP_ID) return { ...g, name: 'Stamp' + sp(S.baseSpool), color: $('baseColor').value };
     if (p.id === CRIM_ID) return { ...g, name: 'Rim' + sp(rimSpool('coin')), color: rimFill('coin') };
     if (p.id === RIM_ID) return { ...g, name: 'Border wall' + sp(rimSpool('tray')), color: rimFill('tray') };
@@ -1386,11 +1500,12 @@ const GEN = {
   cookie: { title: 'Cookie cutter', suffix: '_cookie_cutter', imgH: 1, smooth: 0.2 },
   bookmark: { title: 'Bookmark', suffix: '_bookmark', imgH: 1, smooth: 0.15,
     flat: { kSize: 150, kThick: 1.6, kDepth: 1, kMargin: 3, kGaps: 4, kScale: 100, kOffX: 0, kOffY: 0, shape: 'rect', kRimFil: '-1', faceDown: true } },
+  paint: { title: 'Paint a model', suffix: '_painted', imgH: 1, smooth: 0.15 },
   dust: { title: 'Dust cover', suffix: '_dust_cover', imgH: 1, smooth: 0.12,
     flat: { kSize: 41.5, kThick: 1, kDepth: 0.6, kMargin: 1, kGaps: 4, kScale: 100, kOffX: 0, kOffY: 0, shape: 'circle', kRimFil: '-1', faceDown: true } },
 };
-const GEN_NAME = { tray: 'Trinket tray', coin: 'Coin & token', keychain: 'Keychain', magnet: 'Magnet', coaster: 'Coaster', bookmark: 'Bookmark', cookie: 'Cookie cutter', flat: 'Flat model', dust: 'Dust cover' };
-const GEN_BTN = { tray: 'genTray', coin: 'genCoin', keychain: 'genKey', magnet: 'genMag', coaster: 'genCoast', bookmark: 'genBook', cookie: 'genCookie', flat: 'genFlat', dust: 'genDust' };
+const GEN_NAME = { tray: 'Trinket tray', coin: 'Coin & token', keychain: 'Keychain', magnet: 'Magnet', coaster: 'Coaster', bookmark: 'Bookmark', cookie: 'Cookie cutter', flat: 'Flat model', dust: 'Dust cover', paint: 'Paint a model' };
+const GEN_BTN = { tray: 'genTray', coin: 'genCoin', keychain: 'genKey', magnet: 'genMag', coaster: 'genCoast', bookmark: 'genBook', cookie: 'genCookie', flat: 'genFlat', dust: 'genDust', paint: 'genPaint' };
 const FLAT = new Set(['keychain', 'magnet', 'coaster', 'bookmark', 'flat', 'dust']); // share the flat-model panel
 const FLAT_IDS = ['kSize', 'kThick', 'kDepth', 'kMargin', 'kGaps', 'kScale', 'kOffX', 'kOffY'];
 function saveFlat(g) { const v = GEN[g].flat; FLAT_IDS.forEach(id => v[id] = +$(id).value); if (g !== 'bookmark') v.shape = kcShape(); v.kRimFil = $('kRimFil').value; v.faceDown = $('kFaceDown').checked; }
@@ -1437,6 +1552,15 @@ function setGen(g) {
   S.gen = g;
   for (const k in GEN_BTN) $(GEN_BTN[k]).setAttribute('aria-selected', k === g);
   document.body.classList.toggle('gen-cookie', g === 'cookie');
+  document.body.classList.toggle('gen-paint', g === 'paint'); $('pmOpts').hidden = g !== 'paint';
+  if (g !== 'paint') { setPlacing(false); setLaying(false); }
+  syncTextOnly();
+  // Paint a model can start from the model (and text) alone, so its steps open before any image
+  ['sText', 's5'].forEach(id => enable(id, g === 'paint' || !!(S.prep && S.prep.labels)));
+  $('baseWord').textContent = g === 'paint' ? 'Model' : 'Base';
+  $('dlOrca').classList.toggle('primary', g === 'paint');
+  if (!S.dlHintText) S.dlHintText = $('dlHint').innerHTML;
+  $('dlHint').innerHTML = g === 'paint' ? 'Open the 3MF in Orca Slicer. The art arrives as color painting on your model, already on the filament slots above, and you can touch it up with the color painting tool (N).' : S.dlHintText;
   $('trayOpts').hidden = g !== 'tray'; $('coinOpts').hidden = g !== 'coin'; $('kcOpts').hidden = !FLAT.has(g); $('cookieOpts').hidden = g !== 'cookie';
   if (FLAT.has(g)) loadFlat(g);
   $('s5Title').textContent = GEN[g].title;
@@ -1447,7 +1571,7 @@ function setGen(g) {
   document.title = '3D Maker Generators · ' + GEN_NAME[g];
   if (gl) gl.framed = false;
   syncCoinMode(); closePop();
-  if (S.prep && S.prep.labels) renderRimOptions();
+  if (S.prep && S.prep.labels) { renderRegions(); renderRimOptions(); }
   if (S.pendingRimFil != null) { const s = $('kRimFil'); if ([...s.options].some(o => o.value === S.pendingRimFil)) s.value = S.pendingRimFil; S.pendingRimFil = null; }
   syncKcShape(); renderTally();
   if (S.prep && S.prep.labels) { renderRegions(); scheduleBuild(); }
@@ -1461,6 +1585,278 @@ $('genBook').addEventListener('click', () => setGen('bookmark'));
 $('genCookie').addEventListener('click', () => setGen('cookie'));
 $('genFlat').addEventListener('click', () => setGen('flat'));
 $('genDust').addEventListener('click', () => setGen('dust'));
+$('genPaint').addEventListener('click', () => { setGen('paint'); if (!S.model) status('Choose the model to paint, then add an image, some text, or both.'); else if (!(S.prep && S.prep.labels)) showModelOnly(); else scheduleBuild(); });
+// ---------- paint a model ----------
+// Text alone (no image): a blank stand-in picture for the text to sit on. A real image replaces it.
+function syncTextOnly() {
+  const want = S.gen === 'paint' && !S.img && !!$('tText').value.trim();
+  if (want && !(S.prep && S.prep.textOnly)) {
+    const n = 1000 * 1000;
+    S.prep = { width: 1000, height: 1000, mask: new Uint8Array(n), labels: new Int16Array(n).fill(-1), data: new Uint8ClampedArray(n * 4), textOnly: true };
+    S.regions = []; CMP = null; S.pmNeedsFit = !!S.model;
+    renderRegions(); renderRimOptions();
+  } else if (!want && S.prep && S.prep.textOnly) { S.prep = null; CMP = null; if (S.model && S.gen === 'paint') showModelOnly(); }
+  syncTextUI();
+}
+// Load the person's own STL/3MF, project the art onto it and keep the result as Orca color painting.
+S.model = null; S.pmViewDir = [0, 1, 0];
+const PM_DIRS = { front: [0, 1, 0], back: [0, -1, 0], left: [1, 0, 0], right: [-1, 0, 0], top: [0, 0, -1] };
+const pmMode = () => (document.querySelector('input[name=pmMode]:checked') || {}).value || 'flat';
+const pmDirVec = () => $('pmDir').value === 'view' ? S.pmViewDir : $('pmDir').value === 'click' && S.pmClick ? S.pmClick.dir : PM_DIRS[$('pmDir').value] || PM_DIRS.front;
+// the axis and radius to wrap around: a circle fitted to the outward-facing side walls, dropping whatever does not
+// sit on it (a mug handle, a spout, the inside wall), so the art wraps round the body and is not stretched
+function wrapFit(mesh) {
+  const P = mesh.positions, I = mesh.indices, pts = [];
+  for (let t = 0; t < I.length; t += 3) {
+    const a = I[t] * 3, b = I[t + 1] * 3, c = I[t + 2] * 3;
+    const ux = P[b] - P[a], uy = P[b + 1] - P[a + 1], uz = P[b + 2] - P[a + 2], vx = P[c] - P[a], vy = P[c + 1] - P[a + 1], vz = P[c + 2] - P[a + 2];
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, area = Math.hypot(nx, ny, nz) / 2;
+    if (!(area > 0) || Math.abs(nz) / (2 * area) > 0.35) continue; // walls only
+    pts.push({ x: (P[a] + P[b] + P[c]) / 3, y: (P[a + 1] + P[b + 1] + P[c + 1]) / 3, nx: nx / (2 * area), ny: ny / (2 * area), w: area });
+  }
+  const total = pts.reduce((s, p) => s + p.w, 0);
+  if (!total) return { axis: [0, 0], R: Math.max(mesh.size[0], mesh.size[1]) / 2 || 10, round: false };
+  let cx = pts.reduce((s, p) => s + p.x * p.w, 0) / total, cy = pts.reduce((s, p) => s + p.y * p.w, 0) / total, R = 0, use = pts;
+  for (let it = 0; it < 6; it++) {
+    // walls facing away from the centre, and (after the first pass) close to the circle
+    use = pts.filter(p => { const dx = p.x - cx, dy = p.y - cy, r = Math.hypot(dx, dy) || 1; return (p.nx * dx + p.ny * dy) / r > 0.5 && (!R || Math.abs(r - R) < 0.15 * R); });
+    if (use.length < 3) break;
+    // weighted Kasa circle fit: x² + y² + Dx + Ey + F = 0
+    let sxx = 0, sxy = 0, syy = 0, sx = 0, sy = 0, sw = 0, sxz = 0, syz = 0, sz = 0;
+    for (const p of use) { const x = p.x - cx, y = p.y - cy, z = x * x + y * y, w = p.w; sxx += w * x * x; sxy += w * x * y; syy += w * y * y; sx += w * x; sy += w * y; sw += w; sxz += w * x * z; syz += w * y * z; sz += w * z; }
+    const A = [[sxx, sxy, sx], [sxy, syy, sy], [sx, sy, sw]], B = [-sxz, -syz, -sz];
+    const det = m => m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+    const d = det(A); if (Math.abs(d) < 1e-12) break;
+    const sol = [0, 1, 2].map(k => det(A.map((row, i) => row.map((v, j) => j === k ? B[i] : v))) / d);
+    const ncx = cx - sol[0] / 2, ncy = cy - sol[1] / 2, r2 = sol[0] * sol[0] / 4 + sol[1] * sol[1] / 4 - sol[2];
+    if (!(r2 > 0)) break;
+    cx = ncx; cy = ncy; R = Math.sqrt(r2);
+  }
+  if (!R) R = Math.max(mesh.size[0], mesh.size[1]) / 2;
+  const on = use.reduce((s, p) => s + p.w, 0) / total;
+  // round when most of the wall area sits on the circle and the body is reasonably tall
+  return { axis: [cx, cy], R, round: on > 0.45 && mesh.size[2] > 0.5 * R && use.length >= 8 };
+}
+// pixels of the picture itself (without the text around it); with text only, the text block
+function pmArtWidth(fallback) { return S.prep && !S.prep.textOnly ? S.prep.width : fallback.width; }
+function pmSet(id, v) { const el = $(id); el.value = Math.min(+el.max, Math.max(+el.min, v)); el.dispatchEvent(new Event('input')); }
+// a sensible art size for the chosen side: as big as fits with a little room around it
+function pmDefaults() {
+  if (!S.model) return;
+  const [sx, sy, sz] = S.model.size, p = S.prep, cmp = p && p.labels ? composite() : null;
+  const aspect = cmp ? cmp.W / cmp.H : p ? p.width / p.height : 1;
+  let fw, fh;
+  if (pmMode() === 'wrap') { fw = Math.PI * S.model.wrapR * 0.7; fh = sz; }
+  else {
+    // the model's outline as seen along the painting direction, with the same right/up the art will use
+    const d = $('pmDir').value, pr = C.makeProjector({ art: { width: 1, height: 1 }, mmPerPx: 1, kind: 'flat', dir: pmDirVec(), center: [0, 0, 0],
+      up: d === 'click' && S.pmClick ? S.pmClick.up : d === 'view' ? S.pmViewUp : null });
+    const P = S.model.positions, step = Math.max(1, Math.floor(P.length / 3 / 20000)) * 3; let a0 = 1e9, a1 = -1e9, b0 = 1e9, b1 = -1e9;
+    for (let i = 0; i < P.length; i += step) { const q = pr.plane([P[i], P[i + 1], P[i + 2]]); if (q[0] < a0) a0 = q[0]; if (q[0] > a1) a1 = q[0]; if (q[1] < b0) b0 = q[1]; if (q[1] > b1) b1 = q[1]; }
+    fw = a1 - a0; fh = b1 - b0;
+    // a view turned at an angle sees the outline's box bigger than the face itself, so leave more room
+    if (d === 'click' || d === 'view') { fw *= 0.8; fh *= 0.8; }
+  }
+  // fit the whole thing (art and text) in the face, then express it as the picture's width
+  const whole = Math.min(fw * 0.8, fh * 0.8 * aspect), k = cmp ? pmArtWidth(cmp.prep) / cmp.W : 1;
+  pmSet('pmW', Math.max(1, Math.round(whole * k * 2) / 2));
+  pmSet('pmX', 0); pmSet('pmY', 0);
+}
+function syncPmMode() {
+  const wrap = pmMode() === 'wrap';
+  $('pmDirField').hidden = wrap; $('pmTurnField').hidden = !wrap;
+  $('pmModeHint').textContent = wrap ? 'Wraps the art around the model like a label, for mugs, cups, cylinders and other round shapes. The model stands upright; the art starts at the front.'
+    : 'Projects the art straight onto one side, like a slide projector. Best for flat and gently curved faces.';
+}
+function paintModel(art, cmp) {
+  const base = $('baseColor').value.toLowerCase(), keyColors = [null], keyOf = new Map();
+  const keyFor = hex => { hex = hex.toLowerCase(); if (hex === base) return 0; if (!keyOf.has(hex)) { keyOf.set(hex, keyColors.length); keyColors.push(hex); } return keyOf.get(hex); };
+  const stateOf = S.regions.map(r => { const e = effectiveRegion(r); return !e || e.flat ? 0 : keyFor(e.filament); });
+  if (cmp) stateOf.push(keyFor(textFill()));
+  // the width is the picture's own width, so text added beside it never shrinks the art (text alone: the text's width)
+  const mesh = S.model, sz = mesh.size, mmPerPx = +$('pmW').value / pmArtWidth(art);
+  // the picture stays put when text is added or resized: aim the projection at the picture's centre, not at the
+  // middle of picture + text (the shift is turned with the art's rotation so it holds at any angle)
+  let offX = +$('pmX').value, offY = +$('pmY').value;
+  if (cmp && S.prep && !S.prep.textOnly) {
+    const ex = (cmp.ox + S.prep.width / 2 - cmp.W / 2) * mmPerPx, ey = (cmp.H / 2 - (cmp.oy + S.prep.height / 2)) * mmPerPx;
+    const r = +$('pmRot').value * Math.PI / 180, cr = Math.cos(r), sr = Math.sin(r);
+    offX -= ex * cr - ey * sr; offY -= ex * sr + ey * cr;
+  }
+  const o = { art, stateOf, mmPerPx, offX, offY, rotation: +$('pmRot').value, maxAngle: +$('pmAngle').value, minEdge: +$('pmDetail').value, preview: true };
+  if (pmMode() === 'wrap') Object.assign(o, { kind: 'wrap', axis: mesh.wrapAxis, radius: mesh.wrapR, zc: sz[2] / 2, startDeg: +$('pmTurn').value });
+  else Object.assign(o, { kind: 'flat', dir: pmDirVec(),
+    up: $('pmDir').value === 'click' && S.pmClick ? S.pmClick.up : $('pmDir').value === 'view' ? S.pmViewUp : null,
+    // a clicked spot is the centre; otherwise a round body is centred on its own axis, not the handle
+    center: $('pmDir').value === 'click' && S.pmClick ? S.pmClick.center : mesh.round ? [mesh.wrapAxis[0], mesh.wrapAxis[1], sz[2] / 2] : [0, 0, sz[2] / 2] });
+  const r = C.paintMesh(mesh, o);
+  return { parts: [{ id: 'base', mesh }], size: [sz[0], sz[1]], height: sz[2], mmPerPx, trees: r.trees, painted: r.painted, keyColors, preview: r.preview,
+    map: { toArt3: pt => r.projector.px([pt.x, pt.y, pt.z]) } };
+}
+function showModelOnly() {
+  if (!S.model) return;
+  const m = S.model.size;
+  S.tray = { parts: [{ id: 'base', mesh: S.model }], size: [m[0], m[1]], height: m[2], map: {} };
+  showTray(S.tray); setView('3d');
+  $('dims').textContent = `${m[0].toFixed(1)} × ${m[1].toFixed(1)} × ${m[2].toFixed(1)} mm`;
+}
+async function inflateRaw(b) {
+  if (typeof DecompressionStream !== 'function') throw new Error('this browser cannot unpack 3MF files; try the STL instead');
+  return new Uint8Array(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+}
+// the model at the chosen scale (kept separately from the loaded original so scaling never compounds);
+// moveArt keeps the art the same size and place relative to the model
+function applyModelScale(moveArt) {
+  const o = S.modelOrig; if (!o) return false;
+  const k = +$('pmScale').value / 100, prev = S.model ? S.model.scale : k;
+  if (S.model && Math.abs(prev - k) < 1e-9) return false;
+  const P = new Float32Array(o.positions.length); for (let i = 0; i < P.length; i++) P[i] = o.positions[i] * k;
+  S.model = { positions: P, indices: o.indices, size: o.size.map(v => v * k), name: o.name, wrapR: o.wrapR * k, wrapAxis: o.wrapAxis.map(v => v * k), round: o.round, scale: k };
+  if (S.pmClick && prev) { const f = k / prev; S.pmClick.center = S.pmClick.center.map(v => v * f); }
+  if (moveArt && prev) { const f = k / prev; ['pmW', 'pmX', 'pmY'].forEach(id => { const el = $(id); el.value = Math.min(+el.max, Math.max(+el.min, +el.value * f)); el.dispatchEvent(new Event('input')); }); }
+  const m = S.model.size;
+  if (document.activeElement !== $('pmHmm')) $('pmHmm').value = m[2].toFixed(1);
+  $('pmSizeTxt').textContent = `${m[0].toFixed(1)} × ${m[1].toFixed(1)} mm footprint`;
+  if (gl) gl.framed = false;
+  return true;
+}
+async function loadModelFile(file) {
+  if (!file) return;
+  if (!/\.(stl|3mf)$/i.test(file.name)) { status('Choose an .stl or .3mf model file.'); return; }
+  status('Reading ' + file.name + '…');
+  try {
+    const mesh = await C.loadMesh(file.name, new Uint8Array(await file.arrayBuffer()), inflateRaw);
+    mesh.name = file.name.replace(/\.(stl|3mf)$/i, '').slice(0, 60) || 'Model';
+    const fit = wrapFit(mesh); mesh.wrapR = fit.R; mesh.wrapAxis = fit.axis; mesh.round = fit.round;
+    S.modelOrig = mesh; S.modelLoaded = mesh; S.model = null; S.pmClick = null; $('pmLayReset').hidden = true;
+    // until a model filament is chosen, show the model in a light neutral grey so any art color stands out on it
+    if (!S.pmBaseChosen) { $('baseColor').value = '#c8c8c8'; S.baseSpool = null; $('baseSpool').textContent = ''; refreshSwatches(); }
+    if ($('pmDir').value === 'click') $('pmDir').value = 'front';
+    if (!S.img) { S.name = mesh.name.replace(/[^\w-]+/g, '_'); $('fileName').value = S.name + GEN.paint.suffix; }
+    $('pmScale').value = 100; $('pmScale').dispatchEvent(new Event('input'));
+    applyModelScale(false);
+    const m = mesh.size;
+    $('pmTitle').textContent = mesh.name;
+    $('pmInfo').textContent = `${m[0].toFixed(1)} × ${m[1].toFixed(1)} × ${m[2].toFixed(1)} mm as loaded, ${(mesh.indices.length / 3).toLocaleString()} triangles. Click to choose another model.`;
+    $('pmScaleBox').hidden = false;
+    $('pmDrop').classList.add('loaded');
+    if (gl) gl.framed = false;
+    // a round model probably wants the wrap
+    const roundish = mesh.round;
+    if (roundish !== (pmMode() === 'wrap')) { $(roundish ? 'pmWrap' : 'pmFlat').checked = true; syncPmMode(); }
+    pmDefaults(); S.pmNeedsFit = true;
+    if (S.gen !== 'paint') setGen('paint'); else syncTextOnly();
+    status('');
+    if (S.prep && S.prep.labels) scheduleBuild(); else { showModelOnly(); status('Now add an image, or type some text under Text, to paint on it.'); }
+  } catch (e) { console.error(e); status('Could not read that model: ' + e.message); }
+}
+$('pmFile').addEventListener('change', e => { loadModelFile(e.target.files[0]); e.target.value = ''; });
+$('pmDrop').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('pmFile').click(); } });
+['dragenter', 'dragover'].forEach(ev => $('pmDrop').addEventListener(ev, e => { e.preventDefault(); $('pmDrop').classList.add('over'); }));
+['dragleave', 'drop'].forEach(ev => $('pmDrop').addEventListener(ev, e => { e.preventDefault(); $('pmDrop').classList.remove('over'); }));
+$('pmDrop').addEventListener('drop', e => loadModelFile(e.dataTransfer.files[0]));
+document.querySelectorAll('input[name=pmMode]').forEach(r => r.addEventListener('change', () => { syncPmMode(); pmDefaults(); scheduleBuild(); }));
+$('pmDir').addEventListener('change', () => { pmDefaults(); scheduleBuild(); });
+$('pmView').addEventListener('click', () => {
+  if (!gl) { status('Open the 3D model view first, turn it to face the side to paint, then press this again.'); return; }
+  const d = new THREE.Vector3(); gl.camera.getWorldDirection(d);
+  S.pmViewDir = [d.x, d.y, d.z]; S.pmViewUp = viewUp(); $('pmDir').value = 'view'; pmDefaults(); scheduleBuild();
+});
+['pmW', 'pmX', 'pmY', 'pmRot', 'pmTurn', 'pmAngle', 'pmDetail'].forEach(id => $(id).addEventListener('input', scheduleBuild));
+// Click the model to place the art: the art is centred on the clicked spot. Straight on, it is painted along
+// the surface's own facing there; wrapped, the click sets how far round and how high the art sits.
+function setPlacing(on) {
+  S.placing = !!on && !!S.model;
+  if (S.placing && S.laying) setLaying(false);
+  $('pmPlace').classList.toggle('on', S.placing);
+  $('pmPlace').textContent = S.placing ? 'Now click the model… (Esc to cancel)' : 'Click the model to place the art';
+  document.body.classList.toggle('placing', S.placing);
+  if (S.placing) { setView('3d'); status('Click the spot on the model where the middle of the art should go.'); }
+  else if (/^Click the spot/.test($('status').textContent)) status('');
+}
+// the screen's up direction in the 3D view, in model coordinates
+function viewUp() { const v = new THREE.Vector3().setFromMatrixColumn(gl.camera.matrixWorld, 1); return [v.x, v.y, v.z]; }
+function placeArtAt(hit) {
+  const p = hit.point, n = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : new THREE.Vector3(0, -1, 0);
+  const m = S.model;
+  if (pmMode() === 'wrap') {
+    const [ax, ay] = m.wrapAxis; let t = Math.atan2(p.x - ax, -(p.y - ay)) * 180 / Math.PI;
+    pmSet('pmTurn', Math.round(t)); pmSet('pmX', 0); pmSet('pmY', Math.round((p.z - m.size[2] / 2) * 2) / 2);
+  } else {
+    S.pmClick = { dir: [-n.x, -n.y, -n.z], center: [p.x, p.y, p.z], up: viewUp() };
+    const first = $('pmDir').value !== 'click'; $('pmDir').value = 'click'; pmSet('pmX', 0); pmSet('pmY', 0);
+    if (first) pmDefaults();
+  }
+  setPlacing(false); scheduleBuild();
+}
+// Lay on face, like the slicer's: the clicked face turns to point straight down and the model sits on the plate on it
+function setLaying(on) {
+  S.laying = !!on && !!S.model;
+  if (S.laying && S.placing) setPlacing(false);
+  $('pmLay').classList.toggle('on', S.laying);
+  $('pmLay').textContent = S.laying ? 'Now click a face… (Esc to cancel)' : 'Lay on face';
+  document.body.classList.toggle('placing', S.laying || !!S.placing);
+  if (S.laying) { setView('3d'); status('Click the face of the model that should sit flat on the plate.'); }
+  else if (/^Click the face/.test($('status').textContent)) status('');
+}
+// rotate the loaded mesh so direction n points straight down, then sit it on the plate, centred
+function orientMesh(src, n) {
+  const P = src.positions, Q = new Float32Array(P.length), t = [0, 0, -1];
+  let ax = n[1] * t[2] - n[2] * t[1], ay = n[2] * t[0] - n[0] * t[2], az = n[0] * t[1] - n[1] * t[0];
+  const sin = Math.hypot(ax, ay, az), cos = n[0] * t[0] + n[1] * t[1] + n[2] * t[2];
+  let R;
+  if (sin < 1e-9) R = cos > 0 ? [1, 0, 0, 0, 1, 0, 0, 0, 1] : [1, 0, 0, 0, -1, 0, 0, 0, -1]; // already down / flip over
+  else {
+    ax /= sin; ay /= sin; az /= sin; const C1 = 1 - cos;
+    R = [cos + ax * ax * C1, ax * ay * C1 - az * sin, ax * az * C1 + ay * sin,
+      ay * ax * C1 + az * sin, cos + ay * ay * C1, ay * az * C1 - ax * sin,
+      az * ax * C1 - ay * sin, az * ay * C1 + ax * sin, cos + az * az * C1];
+  }
+  const lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
+  for (let i = 0; i < P.length; i += 3) {
+    const x = P[i], y = P[i + 1], z = P[i + 2];
+    for (let k = 0; k < 3; k++) { const v = R[k * 3] * x + R[k * 3 + 1] * y + R[k * 3 + 2] * z; Q[i + k] = v; if (v < lo[k]) lo[k] = v; if (v > hi[k]) hi[k] = v; }
+  }
+  const cx = (lo[0] + hi[0]) / 2, cy = (lo[1] + hi[1]) / 2;
+  for (let i = 0; i < Q.length; i += 3) { Q[i] -= cx; Q[i + 1] -= cy; Q[i + 2] -= lo[2]; }
+  const out = { positions: Q, indices: src.indices, size: [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]], name: src.name };
+  const fit = wrapFit(out); out.wrapR = fit.R; out.wrapAxis = fit.axis; out.round = fit.round;
+  return out;
+}
+function setModelOrientation(mesh) {
+  S.modelOrig = mesh; S.model = null; S.pmClick = null;
+  if ($('pmDir').value === 'click') $('pmDir').value = 'front';
+  applyModelScale(false);
+  $('pmLayReset').hidden = mesh === S.modelLoaded;
+  if (mesh.round !== (pmMode() === 'wrap')) { $(mesh.round ? 'pmWrap' : 'pmFlat').checked = true; syncPmMode(); }
+  pmDefaults(); if (gl) gl.framed = false;
+  if (S.prep && S.prep.labels) scheduleBuild(); else showModelOnly();
+}
+function layOnFace(hit) {
+  const n = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : null;
+  setLaying(false);
+  if (!n) return;
+  // the scaled copy and the original only differ in size, so the face points the same way in both
+  setModelOrientation(orientMesh(S.modelOrig, [n.x, n.y, n.z]));
+}
+$('pmLay').addEventListener('click', () => {
+  if (!S.model) { status('Choose the model to paint first.'); return; }
+  setLaying(!S.laying);
+});
+$('pmLayReset').addEventListener('click', () => { if (S.modelLoaded) { setLaying(false); setModelOrientation(S.modelLoaded); } });
+$('pmPlace').addEventListener('click', () => {
+  if (!S.model) { status('Choose the model to paint first.'); return; }
+  setPlacing(!S.placing);
+});
+window.addEventListener('keydown', e => { if (e.key === 'Escape') { if (S.placing) setPlacing(false); if (S.laying) setLaying(false); } });
+$('pmScale').addEventListener('input', () => { if (!applyModelScale(true)) return; if (S.prep && S.prep.labels) scheduleBuild(); else showModelOnly(); });
+$('pmHmm').addEventListener('change', () => {
+  const o = S.modelOrig, h = parseFloat($('pmHmm').value); if (!o || !(h > 0) || !(o.size[2] > 0)) return;
+  const el = $('pmScale'), pct = Math.min(+el.max, Math.max(+el.min, h / o.size[2] * 100));
+  el.value = pct; el.dispatchEvent(new Event('input')); $('pmHmm').blur();
+});
+$('pmHmm').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('pmHmm').dispatchEvent(new Event('change')); } });
+syncPmMode();
 $('kFaceDown').addEventListener('change', () => { if (S.tray) { status(''); recordState(); magnetHint(); } });
 ['ckSize', 'ckH', 'ckWall', 'ckBlade', 'ckLip', 'ckLipH', 'ckGaps', 'ckBoost', 'ckRel', 'ckST', 'ckClr'].forEach(id => $(id).addEventListener('input', scheduleBuild));
 $('ckStamp').addEventListener('change', () => { $('ckStampFields').hidden = !$('ckStamp').checked; scheduleBuild(); });
@@ -1499,7 +1895,7 @@ $('uniformH').addEventListener('change', syncCoinMode);
 // every setting in the panel, orientation and generator. Taken after each rebuild settles, so a
 // slider drag or a run of quick edits lands as one step.
 const H = { undo: [], redo: [], cur: null, restoring: false, LIMIT: 40, seq: 0 };
-const CONTROL_SKIP = new Set(['file', 'fileName', 'spQ', 'spCustom', 'paintColor', 'popColor', 'popH', 'spClosest']);
+const CONTROL_SKIP = new Set(['file', 'fileName', 'pmHmm', 'spQ', 'spCustom', 'paintColor', 'popColor', 'popH', 'spClosest']);
 function controlState() {
   const out = {};
   document.querySelectorAll('.panel input[id], .panel select[id], .panel textarea[id]').forEach(el => {
@@ -1522,8 +1918,11 @@ function takeSnapshot() {
     prep: p, labels, labelsId, gen: S.gen, mirror: S.mirror,
     regions: S.regions.map(r => ({ ...r })), stats: S.stats,
     baseColor: $('baseColor').value, baseSpool: S.baseSpool || null, controls: controlState(), rimCustom: { ...S.rimCustom }, textC: { ...S.textC },
+    // Paint a model: which way the model lies and where the art was clicked into place, so undo covers those too
+    paint: S.modelOrig ? { orig: S.modelOrig, click: S.pmClick ? JSON.parse(JSON.stringify(S.pmClick)) : null, viewDir: S.pmViewDir, viewUp: S.pmViewUp || null } : null,
   };
-  snap.key = JSON.stringify([snap.gen, snap.mirror, snap.regions.map(r => [r.name, r.filament, r.height, r.merge, r.pixels, r.spool && spoolKey(r.spool), r.stamp]), snap.baseColor, snap.baseSpool && spoolKey(snap.baseSpool), snap.controls, Object.values(snap.rimCustom).map(c => c && [c.color, c.spool && spoolKey(c.spool)]), [snap.textC.color, snap.textC.spool && spoolKey(snap.textC.spool)]]) + '|' + labelsId;
+  if (snap.paint && !snap.paint.orig.uid) snap.paint.orig.uid = ++H.seq;
+  snap.key = JSON.stringify([snap.gen, snap.mirror, snap.regions.map(r => [r.name, r.filament, r.height, r.merge, r.pixels, r.spool && spoolKey(r.spool), r.stamp]), snap.baseColor, snap.baseSpool && spoolKey(snap.baseSpool), snap.controls, Object.values(snap.rimCustom).map(c => c && [c.color, c.spool && spoolKey(c.spool)]), [snap.textC.color, snap.textC.spool && spoolKey(snap.textC.spool)], snap.paint && [snap.paint.orig.uid, snap.paint.click, snap.paint.viewDir, snap.paint.viewUp]]) + '|' + labelsId;
   return snap;
 }
 function recordState() {
@@ -1560,6 +1959,15 @@ function restoreSnapshot(s) {
     }
     renderRegions(); renderRimOptions();
     for (const [el, v] of selects) if ([...el.options].some(o => o.value === v)) el.value = v;
+    if (s.paint) {
+      // rebuild the model at the restored scale from the restored orientation (S.model = null so nothing is rescaled twice)
+      const turned = S.modelOrig !== s.paint.orig, keepView = !!(gl && gl.framed && !turned);
+      S.modelOrig = s.paint.orig; S.model = null;
+      S.pmClick = s.paint.click ? JSON.parse(JSON.stringify(s.paint.click)) : null; S.pmViewDir = s.paint.viewDir; S.pmViewUp = s.paint.viewUp;
+      applyModelScale(false); if (keepView) gl.framed = true; // only re-aim the camera when the model turned
+      $('pmLayReset').hidden = S.modelOrig === S.modelLoaded;
+      setPlacing(false); setLaying(false); syncPmMode();
+    }
     syncRimField(); $('imgHField').hidden = !$('uniformH').checked; $('fFields').hidden = !$('fOn').checked; $('ckStampFields').hidden = !$('ckStamp').checked; syncCoinMode(); syncKcShape(); syncTextUI(); syncTextFil();
     if (typeof syncSize === 'function' && S.gen === 'tray') syncSize();
     drawThumbs(); drawPreview(); renderPaintSwatches();
@@ -1619,7 +2027,7 @@ function fillPop() {
   const count = labelCount(L), whole = S.sel.pixels.length >= count;
   $('popSrc').style.background = r.source;
   $('popTitle').innerHTML = `${escapeHtml(r.name)} <small>${Math.max(0.1, S.sel.pixels.length / total * 100).toFixed(1)}% of art</small>`;
-  document.querySelector('.seg').hidden = whole;
+  document.querySelector('.pop .seg, #pop .seg').hidden = whole;
   if (whole) $('scopePiece').checked = true;
   $('scopeAllLbl').textContent = `All ${r.name.toLowerCase()}`;
   $('popColor').value = e.flat ? $('baseColor').value : e.filament;
@@ -1704,16 +2112,19 @@ function pick3D(e) {
   const ndc = new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
   const ray = new THREE.Raycaster(); ray.setFromCamera(ndc, gl.camera);
   const hit = ray.intersectObjects(gl.group.children, false)[0];
+  if (S.laying) { if (hit && (hit.object.userData.id === 'base' || hit.object.userData.id === 'paint')) layOnFace(hit); return; }
+  if (S.placing) { if (hit && (hit.object.userData.id === 'base' || hit.object.userData.id === 'paint')) placeArtAt(hit); return; }
   if (!hit) { closePop(); return; }
   const pt = hit.point.clone();
-  if (hit.face && Math.abs(hit.face.normal.z) < 0.5) pt.addScaledVector(hit.face.normal, -0.25); // step into the part from a wall
+  if (hit.face && Math.abs(hit.face.normal.z) < 0.5 && S.gen !== 'paint') pt.addScaledVector(hit.face.normal, -0.25); // step into the part from a wall
   const m = S.tray.map, part = hit.object.userData.id;
   if (part === QRIM_ID) { pickRim('coasterRim'); return; }
   if (part === FILL_ID) { pickRim('filler'); return; }
   if (part === RIM_ID || part === CRIM_ID || part === GAP_ID || part === KRIM_ID) { pickRim(); return; }
   if (part === TEXT_ID) { pickText(); return; }
   if (part === STAMP_ID || (S.gen === 'cookie' && part === 'base')) { pickBase(); return; }
-  if (part === 'base' && !onArtPixel(pt, m)) { pickBase(); return; }
+  if (part === 'base' && S.gen === 'paint' && !m.toArt3) { pickBase(); return; }
+  if ((part === 'base' || part === 'paint') && !onArtPixel(pt, m)) { pickBase(); return; }
   const [cx, cy] = buildCoords(pt, m);
   selectAtComposite(cx, cy, e.clientX, e.clientY);
 }
@@ -1778,12 +2189,17 @@ function makeComposite(art, TL, symmetric) {
   const Wt = Math.max(1, ...use.map(lineW)), Ht = use.length * (A + D) + (use.length - 1) * lg;
   let W, H, ox, oy, draw;
   if (!arc) {
-    const tw = Math.ceil(Wt) + 2 * pad, th = Math.ceil(Ht) + 2 * pad;
+    const tw = Math.ceil(Wt) + 2 * pad, th = Math.ceil(Ht) + 2 * pad, side = pos === 'right' || pos === 'left';
+    let tx = 0;
     if (pos === 'over') { W = Math.max(aw, tw); H = Math.max(ah, th); ox = (W - aw) >> 1; oy = (H - ah) >> 1; }
+    else if (side) { // beside the art, centred on its height; lines line up on the side that faces the art
+      W = aw + gap + tw; H = Math.max(ah, th); oy = (H - ah) >> 1;
+      ox = pos === 'right' ? 0 : tw + gap; tx = pos === 'right' ? aw + gap : 0;
+    }
     else { W = Math.max(aw, tw); H = ah + gap + th; ox = (W - aw) >> 1; oy = pos === 'above' ? gap + th : 0; }
-    const ty = pos === 'over' ? (H - th) / 2 : pos === 'above' ? 0 : ah + gap;
+    const ty = pos === 'over' || side ? (H - th) / 2 : pos === 'above' ? 0 : ah + gap;
     draw = c => use.forEach((s, li) => {
-      let x = (W - lineW(s)) / 2; const y = ty + pad + A + li * (A + D + lg);
+      let x = pos === 'right' ? tx + pad : pos === 'left' ? tx + tw - pad - lineW(s) : (W - lineW(s)) / 2; const y = ty + pad + A + li * (A + D + lg);
       for (const ch of s) { c.fillText(ch, x, y); x += c.measureText(ch).width + sp; }
     });
   } else {
@@ -1825,6 +2241,7 @@ function textAt(x, y) {
 }
 // 3D hit -> coordinates in the image the model was built from (the composite when there is text)
 function buildCoords(pt, m) {
+  if (m.toArt3) return m.toArt3(pt);
   if (m.toArt) return m.toArt(pt.x, pt.y);
   return [(pt.x + m.cx) / m.mmPerPx - m.pad, m.H - 1 - (pt.y + m.cy) / m.mmPerPx - m.pad];
 }
@@ -1858,7 +2275,12 @@ function defaultTextColor() {
 function textChanged() { syncTextFil(); renderTally(); drawPreview(); scheduleBuild(); }
 function syncTextUI() {
   $('tOpts').hidden = !$('tText').value.trim();
-  $('tGapField').hidden = $('tPos').value === 'over';
+  // text with no image: its size is set by the width on the model, and there is no art to keep a gap from
+  const only = !!(S.prep && S.prep.textOnly);
+  $('tSizeField').hidden = only; ['over', 'right', 'left'].forEach(v => $('tPos').querySelector(`option[value=${v}]`).hidden = only);
+  if (only && ['over', 'right', 'left'].includes($('tPos').value)) $('tPos').value = 'below';
+  $('pmWField').querySelector('label').textContent = only ? 'Text width' : 'Art width';
+  $('tGapField').hidden = $('tPos').value === 'over' || only;
   $('tHField').hidden = !raisedArt() || uniform();
 }
 function textSizeReadout(mmPerPx) {
@@ -1869,6 +2291,7 @@ function textSizeReadout(mmPerPx) {
   el.classList.toggle('warn', mm < 4);
 }
 $('tText').addEventListener('input', () => {
+  syncTextOnly();
   if (hasText() && !S.textC.touched) { defaultTextColor(); S.textC.touched = true; }
   syncTextUI(); textChanged();
 });
@@ -2177,7 +2600,20 @@ function showTray(res) {
     const mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(p.color).convertSRGBToLinear(), roughness: 0.62, metalness: 0.02, flatShading: true });
     const mesh = new THREE.Mesh(geo, mat); mesh.userData.color = p.color.toLowerCase(); mesh.userData.id = p.id; g.add(mesh);
   });
+  if (res.preview && res.preview.positions.length) {
+    const pv = res.preview, n = pv.states.length, col = new Float32Array(n * 9), c = new THREE.Color();
+    for (let i = 0; i < n; i++) { c.set(res.keyColors[pv.states[i]] || '#ff00ff').convertSRGBToLinear(); for (let k = 0; k < 3; k++) col.set([c.r, c.g, c.b], i * 9 + k * 3); }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pv.positions, 3)); geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    geo.computeVertexNormals();
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.62, metalness: 0.02, flatShading: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    const mesh = new THREE.Mesh(geo, mat); mesh.userData.id = 'paint'; g.add(mesh);
+  }
   applyFocus3D();
+  if (!gl.framed && S.gen === 'paint') {
+    const d = Math.max(res.size[0], res.size[1], res.height);
+    gl.camera.position.set(0, -d * 2.1, res.height / 2 + d * 0.9); gl.controls.target.set(0, 0, res.height / 2); gl.controls.update(); gl.framed = true;
+  }
   if (!gl.framed) {
     const d = Math.max(res.size[0], res.size[1]);
     const k = S.gen === 'tray' ? 1.15 : 1.7; // small flat models read best from a bit further back
@@ -2289,7 +2725,7 @@ function exportParts() {
     return { ...p, mesh: { positions: o, indices: p.mesh.indices } };
   });
 }
-$('dl3mf').addEventListener('click', () => save(fileBase() + '.3mf', C.threeMF(exportParts())));
+$('dl3mf').addEventListener('click', async () => save(fileBase() + '.3mf', S.gen === 'paint' ? await orcaFile() : C.threeMF(exportParts())));
 $('dlStl').addEventListener('click', () => save(fileBase() + '.stl', C.stlBinary(exportParts().map(p => p.mesh))));
 // ---------- filament slots ----------
 // Every distinct filament color gets an Orca filament slot. Inside the Orca plugin the slots are the
@@ -2323,8 +2759,9 @@ function renderSlots() {
   box.hidden = !colors.length;
   $('slotSrc').textContent = orca ? `${orca.length} filament${orca.length === 1 ? '' : 's'} loaded in Orca` + (orca.length < colors.length ? `. Add ${colors.length - orca.length} more in Orca and press Refresh to give every color its own slot.` : '') : 'for Orca Slicer';
   const n = orca ? orca.length : S.maxSlots;
-  $('slotRows').innerHTML = colors.map(hex => {
-    const cur = slotFor(hex, colors), label = escapeHtml(spoolForHex(hex) === hex ? colorName(hex) : spoolForHex(hex));
+  const labels = shadeNames(colors, colors.map(hex => spoolForHex(hex) === hex ? colorName(hex) : spoolForHex(hex)));
+  $('slotRows').innerHTML = colors.map((hex, ci) => {
+    const cur = slotFor(hex, colors), label = escapeHtml(labels[ci]);
     const opts = Array.from({ length: n }, (_, i) => `<option value="${i + 1}"${i + 1 === cur ? ' selected' : ''}>${orca ? `${i + 1} · ${escapeHtml(orca[i].name || 'Filament')}` : 'Slot ' + (i + 1)}</option>`).join('');
     const target = orca && orca[cur - 1] ? `<span class="sw slotc" style="background:${escapeHtml(orca[cur - 1].color)}" title="Orca slot ${cur}"></span>` : '';
     return `<div class="slot-row"><span class="sw" style="background:${hex}"></span><span class="nm" title="${label}">${label}</span><span class="to" aria-hidden="true">→</span>${target}<select data-hex="${hex}" aria-label="Filament slot for ${label}">${opts}</select></div>`;
@@ -2336,6 +2773,10 @@ $('slotRows').addEventListener('change', e => {
 });
 function orcaParts() {
   const colors = slotColors();
+  if (S.gen === 'paint' && S.tray && S.tray.trees) { // one object, the art as Orca color painting on it
+    const p = partList()[0], states = S.tray.keyColors.map(hex => hex ? slotFor(hex, colors) : 0);
+    return [{ name: p.name, extruder: slotFor(p.color, colors), mesh: p.mesh, paint: C.paintStrings(S.tray.trees, states) }];
+  }
   return exportParts().map(p => ({ name: p.name, extruder: slotFor(p.color, colors), mesh: p.mesh }));
 }
 // compress each archive entry with the browser's deflate when it has one (stored otherwise)
@@ -2361,10 +2802,6 @@ if (ORCA) {
   const syncTheme = () => { const t = root.getAttribute('data-orca-theme'); if (t === 'dark' || t === 'light') root.dataset.theme = t; };
   syncTheme(); new MutationObserver(syncTheme).observe(root, { attributes: true, attributeFilter: ['data-orca-theme'] });
   root.style.setProperty('--focus', 'var(--orca-accent, #009688)');
-  document.addEventListener('click', e => {
-    const a = e.target.closest && e.target.closest('a[target=_blank]'); if (!a) return;
-    e.preventDefault(); window.orca.postMessage({ cmd: 'open', url: a.href });
-  });
   const askSlots = () => { if (alive()) window.orca.postMessage({ cmd: 'hello' }); };
   $('slotRefresh').addEventListener('click', askSlots);
   // Reset: the plugin sends a fresh copy of this page, which replaces the document in place.

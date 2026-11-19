@@ -8,8 +8,11 @@ Targets
   web      dist/maker-generators.html             single file; loads three.js and fonts from CDNs
   plugin   dist/maker_generators_orca_plugin.py   OrcaSlicer 2.5 plugin, everything inlined (works offline)
   desktop  desktop/app/                           Neutralino project, ready for `neu build` (see README)
+
+The version comes from the VERSION file and is stamped into the page, plugin, desktop config,
+installer script and package.json on every build.
 """
-import base64, os, re, shutil, sys, zlib
+import base64, os, re, shutil, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC, VENDOR, DIST = (os.path.join(ROOT, d) for d in ('src', 'vendor', 'dist'))
@@ -33,8 +36,26 @@ def replace_once(src, old, new):
     return src.replace(old, new)
 
 
+VERSION = read(ROOT, 'VERSION').strip()
+
+
+def sync_version():
+    """VERSION is the one place the version lives; stamp it into everything that carries one."""
+    for path, pattern, repl in (
+            (('plugin', 'plugin_template.py'), r'# version = "[^"]*"', f'# version = "{VERSION}"'),
+            (('desktop', 'neutralino.config.json'), r'"version": "[^"]*"', f'"version": "{VERSION}"'),
+            (('desktop', 'installer.nsi'), r'!define VERSION(\s+)"[^"]*"', rf'!define VERSION\g<1>"{VERSION}"'),
+            (('package.json',), r'"private": true,', f'"version": "{VERSION}",\n  "private": true,')):
+        src = read(ROOT, *path)
+        if path == ('package.json',):
+            src = re.sub(r'\s*"version": "[^"]*",', '', src, count=1)
+        new = re.sub(pattern, repl, src, count=1)
+        if new != src:
+            write(os.path.join(ROOT, *path), new)
+
+
 def web_page():
-    page = read(SRC, 'app.html')
+    page = read(SRC, 'app.html').replace('__APP_VERSION__', VERSION)
     db = read(SRC, 'spoolmandb.json').replace('</', '<\\/')
     return page.replace('/*CORE*/', read(SRC, 'core.js')).replace('/*SPOOLMANDB*/', db)
 
@@ -66,8 +87,9 @@ def build_plugin():
         js = read(VENDOR, name)
         assert '</script' not in js.lower()
         page = replace_once(page, f'<script src="{url}"></script>', '<script>' + js + '</script>')
-    packed = base64.b64encode(zlib.compress(page.encode('utf-8'), 9)).decode()
-    lines = '\n'.join('    "%s"' % packed[i:i + 100] for i in range(0, len(packed), 100))
+    # plain text in short Python string literals (ascii() escapes anything outside ASCII), so the plugin
+    # can be read and reviewed; no compressed or encoded blob
+    lines = '\n'.join('    ' + ascii(page[i:i + 160]) for i in range(0, len(page), 160))
     out = os.path.join(DIST, 'maker_generators_orca_plugin.py')
     write(out, read(ROOT, 'plugin', 'plugin_template.py').replace('__PAGE_DATA__', lines))
     print('plugin  ', os.path.relpath(out, ROOT))
@@ -101,6 +123,7 @@ def build_desktop():
 TARGETS = {'web': build_web, 'plugin': build_plugin, 'desktop': build_desktop}
 
 if __name__ == '__main__':
+    sync_version()
     wanted = sys.argv[1:] or list(TARGETS)
     for t in wanted:
         if t not in TARGETS:
