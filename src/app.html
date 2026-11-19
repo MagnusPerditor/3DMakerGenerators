@@ -926,6 +926,22 @@ function colorName(hex) {
   return tone + n.toLowerCase().replace(/^./, c => tone ? c : c.toUpperCase());
 }
 
+// Real images often have several shades that get the same name ("Blue", "Blue"). Tell them apart
+// by how light each is compared with the others of that name.
+function shadeNames(hexes, names) {
+  names = names ? names.slice() : hexes.map(colorName);
+  const lum = h => { const [r, g, b] = hexToRgb(h); return 0.299 * r + 0.587 * g + 0.114 * b; };
+  const groups = new Map();
+  names.forEach((n, i) => { if (!groups.has(n)) groups.set(n, []); groups.get(n).push(i); });
+  for (const [n, idx] of groups) {
+    if (idx.length < 2) continue;
+    idx.sort((a, b) => lum(hexes[a]) - lum(hexes[b]));
+    const tags = idx.length === 2 ? ['darker', 'lighter'] : idx.length === 3 ? ['darkest', 'middle', 'lightest'] : null;
+    idx.forEach((i, k) => { names[i] = tags ? `${n} (${tags[k]})` : `${n} ${k + 1}` + (k === 0 ? ' (darkest)' : k === idx.length - 1 ? ' (lightest)' : ''); });
+  }
+  return names;
+}
+
 // ---------- 1. load ----------
 // After a smooth enlargement, edge pixels are blends of two colors, which would show up as extra
 // halo colors. Give each pixel the closest of the original pixels around it instead: the color
@@ -1099,8 +1115,11 @@ async function runColors(resetRegions) {
       // keep a user's choices when the detected color barely moved
       const prev = !resetRegions && old.find(o => o.source === s.color);
       if (prev) return { ...prev, pixels: s.pixels };
-      return { source: s.color, name: colorName(s.color), filament: s.color, height: 3, merge: -1, pixels: s.pixels };
+      return { source: s.color, name: colorName(s.color), filament: s.color, height: 3, merge: -1, pixels: s.pixels, autoName: true };
     });
+    // give same-named shades distinct names (only names the user hasn't typed)
+    const auto = S.regions.filter(r => r.autoName);
+    shadeNames(auto.map(r => r.source)).forEach((n, i) => { auto[i].name = n; });
     // a new image sets the base to its darkest color, except in Paint a model: there the base is the model's own
     // filament, and the image only adds the art's colors on top of it
     if (resetRegions && S.gen !== 'paint') { $('baseColor').value = S.stats[0] ? S.stats[0].color : '#1a1a1a'; S.baseSpool = null; $('baseSpool').textContent = ''; }
@@ -1153,7 +1172,7 @@ function renderRegions() {
     if (!own) { const e = effectiveRegion(r); colorIn.value = e.flat ? $('baseColor').value : e.filament; }
     colorIn.addEventListener('input', () => { r.filament = colorIn.value; r.spool = S.pickedSpool || null; refreshSwatches(); drawPreview(); scheduleBuild(); });
     colorIn.addEventListener('change', () => renderRegions());
-    nameIn.addEventListener('change', () => { r.name = nameIn.value.trim() || colorName(r.source); renderRegions(); renderRimOptions(); recordState(); });
+    nameIn.addEventListener('change', () => { r.name = nameIn.value.trim() || colorName(r.source); r.autoName = false; renderRegions(); renderRimOptions(); recordState(); });
     sel.addEventListener('change', () => { r.merge = +sel.value; renderRegions(); renderRimOptions(); drawPreview(); scheduleBuild(); });
     hIn.addEventListener('change', () => { r.height = Math.max(0.2, Math.min(20, +hIn.value || 1)); hIn.value = r.height; scheduleBuild(); });
     const sp = r.merge === -1 ? r.spool : (effectiveRegion(r).flat ? S.baseSpool : effectiveRegion(r).spool);
@@ -2740,8 +2759,9 @@ function renderSlots() {
   box.hidden = !colors.length;
   $('slotSrc').textContent = orca ? `${orca.length} filament${orca.length === 1 ? '' : 's'} loaded in Orca` + (orca.length < colors.length ? `. Add ${colors.length - orca.length} more in Orca and press Refresh to give every color its own slot.` : '') : 'for Orca Slicer';
   const n = orca ? orca.length : S.maxSlots;
-  $('slotRows').innerHTML = colors.map(hex => {
-    const cur = slotFor(hex, colors), label = escapeHtml(spoolForHex(hex) === hex ? colorName(hex) : spoolForHex(hex));
+  const labels = shadeNames(colors, colors.map(hex => spoolForHex(hex) === hex ? colorName(hex) : spoolForHex(hex)));
+  $('slotRows').innerHTML = colors.map((hex, ci) => {
+    const cur = slotFor(hex, colors), label = escapeHtml(labels[ci]);
     const opts = Array.from({ length: n }, (_, i) => `<option value="${i + 1}"${i + 1 === cur ? ' selected' : ''}>${orca ? `${i + 1} · ${escapeHtml(orca[i].name || 'Filament')}` : 'Slot ' + (i + 1)}</option>`).join('');
     const target = orca && orca[cur - 1] ? `<span class="sw slotc" style="background:${escapeHtml(orca[cur - 1].color)}" title="Orca slot ${cur}"></span>` : '';
     return `<div class="slot-row"><span class="sw" style="background:${hex}"></span><span class="nm" title="${label}">${label}</span><span class="to" aria-hidden="true">→</span>${target}<select data-hex="${hex}" aria-label="Filament slot for ${label}">${opts}</select></div>`;
