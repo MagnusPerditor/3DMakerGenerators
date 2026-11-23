@@ -883,17 +883,27 @@
       let any = false; for (let i = 0; i < N; i++) { const v = lab[i] === id ? 1 : 0; ind[i] = v; if (v) any = true; }
       if (!any) continue;
       const b = blurField(ind, W, H, sPx);
-      for (let i = 0; i < N; i++) { b[i] *= inner[i]; artSum[i] += b[i]; }
+      for (let i = 0; i < N; i++) artSum[i] += b[i];
       fields.set(id, b);
     }
-    const FIELD = -2, BG = -1, RIM = -3, fF = new Float32Array(N), fB = new Float32Array(N);
-    for (let i = 0; i < N; i++) { fF[i] = Math.max(0, inner[i] - artSum[i]); fB[i] = 1 - fpSoft[i]; }
-    fields.set(FIELD, fF); fields.set(BG, fB);
-    if (rimW > 0) { const fR = new Float32Array(N); for (let i = 0; i < N; i++) fR[i] = Math.max(0, fpSoft[i] - inner[i]); fields.set(RIM, fR); }
+    // The colours and the face share out the top among themselves only; where the top ends is decided by
+    // the same footprint line as the body below, so smoothing can never pull the colours in from the edge
+    // and leave a lower ledge of body showing around the outside.
+    const FIELD = -2, RIM = -3, fF = new Float32Array(N);
+    for (let i = 0; i < N; i++) fF[i] = Math.max(0, 1 - artSum[i]);
+    fields.set(FIELD, fF);
     const best = new Float32Array(N).fill(-1), second = new Float32Array(N).fill(-1), bestId = new Int32Array(N).fill(-99);
     for (const [id, f] of fields) for (let i = 0; i < N; i++) { const v = f[i]; if (v > best[i]) { second[i] = best[i]; best[i] = v; bestId[i] = id; } else if (v > second[i]) second[i] = v; }
+    // clip: inside the face (and the footprint, for a tab hole); the rim is the footprint outside the face
+    const clipFace = new Float32Array(N), clipRim = new Float32Array(N);
+    for (let i = 0; i < N; i++) { clipFace[i] = Math.min(2 * inner[i] - 1, 2 * fpSoft[i] - 1); clipRim[i] = Math.min(2 * fpSoft[i] - 1, 1 - 2 * inner[i]); }
     const tol = opts.simplifyPx == null ? 0.2 : opts.simplifyPx, minA = opts.minAreaPx || 4, d = new Float32Array(N);
-    const shapesOf = id => { const f = fields.get(id); if (!f) return []; for (let i = 0; i < N; i++) d[i] = f[i] - (bestId[i] === id ? second[i] : best[i]); return loopsToShapes(marchingSquares(d, W, H, 0), H, res, tol, minA); };
+    const shapesOf = id => {
+      if (id === RIM) { if (!(rimW > 0)) return []; d.set(clipRim); return loopsToShapes(marchingSquares(d, W, H, 0), H, res, tol, minA); }
+      const f = fields.get(id); if (!f) return [];
+      for (let i = 0; i < N; i++) d[i] = Math.min(f[i] - (bestId[i] === id ? second[i] : best[i]), clipFace[i]);
+      return loopsToShapes(marchingSquares(d, W, H, 0), H, res, tol, minA);
+    };
     for (let i = 0; i < N; i++) d[i] = 2 * fpSoft[i] - 1;
     const outline = loopsToShapes(marchingSquares(d, W, H, 0), H, res, tol, minA);
     const T = opts.thicknessMM, dep = Math.max(0.2, Math.min(opts.colorDepthMM, T)), Tb = T - dep > 0.05 ? T - dep : 0;
