@@ -816,6 +816,30 @@
         lab[i] = L; thinChanged++;
       }
     }
+    // a small bare spot where two colours meet at the outline (the notch "Fill gaps" closes between a star's
+    // points and a tree top, say) would show as a sliver of base filament on the face and the side, and cost a
+    // tool change on every layer; it takes the colour that borders it most instead. Spots touching only one
+    // colour (the gap of a "c") and holes inside the art (the eye of an "e") are left alone so letters stay readable.
+    {
+      const seen = new Uint8Array(N), stack = [], speck = 4 / (res * res);
+      for (let s0 = 0; s0 < N; s0++) {
+        if (seen[s0] || !body[s0] || lab[s0] >= 0) continue;
+        const px = []; seen[s0] = 1; stack.push(s0); const votes = new Map(); let outside = false;
+        while (stack.length) {
+          const i = stack.pop(); px.push(i); const x = i % W, y = (i / W) | 0;
+          for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+            if (nx < 0 || ny < 0 || nx >= W || ny >= H) { outside = true; continue; }
+            const j = ny * W + nx;
+            if (!body[j]) { outside = true; continue; }
+            if (lab[j] < 0) { if (!seen[j]) { seen[j] = 1; stack.push(j); } continue; }
+            votes.set(lab[j], (votes.get(lab[j]) || 0) + 1);
+          }
+        }
+        if (px.length > speck || !outside || votes.size < 2) continue;
+        let bestL = -1, bestN = 0; for (const [L, n] of votes) if (n > bestN) { bestN = n; bestL = L; }
+        for (const i of px) lab[i] = bestL;
+      }
+    }
     // colours that run "through the base": the body under them is printed in that colour. Under a surface-only
     // colour (an ornament on the tree) the body takes the through colour that surrounds it; anywhere else the
     // body stays in the base filament.
@@ -922,9 +946,11 @@
     // The colours and the face share out the top among themselves only; where the top ends is decided by
     // the same footprint line as the body below, so smoothing can never pull the colours in from the edge
     // and leave a lower ledge of body showing around the outside.
-    const FIELD = -2, RIM = -3, fF = new Float32Array(N);
-    for (let i = 0; i < N; i++) fF[i] = Math.max(0, 1 - artSum[i]);
-    fields.set(FIELD, fF);
+    // The face (surround) is blurred from its own pixels too, not taken as "whatever the colours leave": near
+    // the outline the colours' blur also sees the empty space outside, and the face would win the corners there.
+    const FIELD = -2, RIM = -3;
+    { let any = false; for (let i = 0; i < N; i++) { const v = fp[i] && lab[i] < 0 ? 1 : 0; ind[i] = v; if (v) any = true; }
+      if (any) fields.set(FIELD, blurField(ind, W, H, sPx)); }
     const best = new Float32Array(N).fill(-1), second = new Float32Array(N).fill(-1), bestId = new Int32Array(N).fill(-99);
     for (const [id, f] of fields) for (let i = 0; i < N; i++) { const v = f[i]; if (v > best[i]) { second[i] = best[i]; best[i] = v; bestId[i] = id; } else if (v > second[i]) second[i] = v; }
     // clip: inside the face (and the footprint, for a tab hole); the rim is the footprint outside the face
