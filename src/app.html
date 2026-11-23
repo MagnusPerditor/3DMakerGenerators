@@ -129,6 +129,8 @@ body.gen-cookie #sText > :not(h2):not(#tCookieNote) { display: none !important; 
 .region .name { flex: 1; min-width: 0; border: 0; background: transparent; font-weight: 600; padding: 2px 0; border-bottom: 1px solid transparent; }
 .region .name:hover, .region .name:focus { border-bottom-color: var(--line); outline: none; }
 .region .src { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.2); flex: none; }
+.region .thru { grid-column: 2 / -1; white-space: nowrap; display: flex; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); margin-top: 6px; cursor: pointer; }
+.region .thru[hidden] { display: none; }
 .region .row { display: flex; gap: 8px; align-items: center; font-size: 13.5px; color: var(--muted); flex-wrap: wrap; }
 .region select { max-width: 150px; }
 .region select, .region input[type=number] { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; font-size: 13.5px; }
@@ -1163,7 +1165,8 @@ function renderRegions() {
         <select aria-label="Filament for ${escapeHtml(r.name)}">${opts}</select>
         <label${raisedArt() ? '' : ' hidden'}>Height <input type="number" min="0.2" max="20" step="0.2" value="${heightOf(r)}" aria-label="Height above base in mm"> mm</label>
         <span>${(r.pixels / total * 100).toFixed(0)}%</span>
-      </div>`;
+      </div>
+      <label class="thru"${throughOK() && r.merge === -1 ? '' : ' hidden'} title="Print the body under this color in this color too, all the way to the bottom. Small details on top of it keep it underneath."><input type="checkbox"${r.through ? ' checked' : ''}> Through the base</label>`;
     const [colorIn, nameIn, sel, hIn] = [el.querySelector('input[type=color]'), el.querySelector('.name'), el.querySelector('select'), el.querySelector('input[type=number]')];
     sel.value = String(r.merge);
     const own = r.merge === -1;
@@ -1175,6 +1178,8 @@ function renderRegions() {
     nameIn.addEventListener('change', () => { r.name = nameIn.value.trim() || colorName(r.source); r.autoName = false; renderRegions(); renderRimOptions(); recordState(); });
     sel.addEventListener('change', () => { r.merge = +sel.value; renderRegions(); renderRimOptions(); drawPreview(); scheduleBuild(); });
     hIn.addEventListener('change', () => { r.height = Math.max(0.2, Math.min(20, +hIn.value || 1)); hIn.value = r.height; scheduleBuild(); });
+    const thIn = el.querySelector('.thru input');
+    thIn.addEventListener('change', () => { r.through = thIn.checked; scheduleBuild(); });
     const sp = r.merge === -1 ? r.spool : (effectiveRegion(r).flat ? S.baseSpool : effectiveRegion(r).spool);
     if (sp) { const d = document.createElement('div'); d.className = 'spool'; d.textContent = spoolLabel(sp); d.title = spoolLabel(sp); el.appendChild(d); }
     el.title = 'Click to highlight on the model';
@@ -1275,6 +1280,8 @@ $('smooth').addEventListener('input', scheduleBuild);
 const uniform = () => $('uniformH').checked;
 const heightOf = r => uniform() ? +$('imgH').value : r.height;
 // art heights only matter when the art stands up (tray, raised coin); keychains and inlaid/engraved coins are flush
+// flat generators can run chosen colors through the base (only when the colors don't already go all the way)
+function throughOK() { return FLAT.has(S.gen) && +$('kDepth').value < +$('kThick').value - 0.05; }
 function raisedArt() { return S.gen === 'tray' || (S.gen === 'coin' && coinMode() === 'raise'); }
 function syncUniform() { $('imgHField').hidden = !uniform(); renderRegions(); fillPop(); scheduleBuild(); }
 $('uniformH').addEventListener('change', syncUniform);
@@ -1420,7 +1427,8 @@ async function build() {
         rimWidthMM: g === 'coaster' ? +$('qRimW').value : 0, rimHeightMM: +$('qRimH').value, rimLayer: QRIM_ID,
         recess: g === 'coaster' && $('qPad').checked ? { depthMM: +$('qPadD').value, insetMM: +$('qPadIn').value } : null,
         minLineMM: +$('kMinLine').value, darkToLight: darkToLight(),
-        fill, layerOf, layers, marginLayer: sep ? KRIM_ID : -1 }, triangulate);
+        fill, layerOf, layers, marginLayer: sep ? KRIM_ID : -1,
+        throughIds: throughOK() ? S.regions.map((r, i) => r.merge === -1 && r.through && r.pixels > 0 ? i : -1).filter(i => i >= 0) : [] }, triangulate);
       if (token !== S.buildToken) return;
       S.tray = res; showTray(res); textSizeReadout(res.mmPerPx);
       $('dims').textContent = `${res.size[0].toFixed(1)} × ${res.size[1].toFixed(1)} × ${res.height.toFixed(1)} mm`;
@@ -1884,6 +1892,10 @@ $('bTassel').addEventListener('change', () => { syncKcShape(); scheduleBuild(); 
 ['mCount', 'mStyle', 'qRimFil', 'qPad'].forEach(id => $(id).addEventListener('change', () => { syncKcShape(); renderTally(); scheduleBuild(); }));
 document.querySelectorAll('input[name=kShape]').forEach(r => r.addEventListener('change', () => { syncKcShape(); scheduleBuild(); }));
 ['kSize', 'kThick', 'kDepth', 'kMargin', 'kGaps', 'kScale', 'kOffX', 'kOffY', 'kHole', 'kRing'].forEach(id => $(id).addEventListener('input', scheduleBuild));
+// "Through the base" only applies while the colors stop short of the bottom
+['kThick', 'kDepth'].forEach(id => $(id).addEventListener('input', () => {
+  document.querySelectorAll('.region').forEach(el => { const r = S.regions[+el.dataset.i], t = el.querySelector('.thru'); if (r && t) t.hidden = !(throughOK() && r.merge === -1); });
+}));
 ['kRimFil', 'kHolePos'].forEach(id => $(id).addEventListener('change', () => { syncKcShape(); scheduleBuild(); }));
 document.querySelectorAll('input[name=cMode]').forEach(r => r.addEventListener('change', () => { syncCoinMode(); scheduleBuild(); }));
 ['cDia', 'cThick', 'cRimW', 'cRimH', 'cDepth', 'cScale', 'cOffX', 'cOffY'].forEach(id => $(id).addEventListener('input', scheduleBuild));

@@ -726,7 +726,8 @@
   //       marginMM (space around the art), fillGapsMM (outline only), artScale, offsetXMM, offsetYMM (shapes only),
   //       centerHole {diaMM} (hole straight through the middle),
   //       holePos ('top'|'top-left'|'top-right'|'left'|'right'|'none'), holeDiaMM, ringWallMM, smoothMM,
-  //       layerOf[label] -> layer id | -1, layers [{id}], marginLayer (id | -1: surround prints in the base filament)
+  //       layerOf[label] -> layer id | -1, layers [{id}], marginLayer (id | -1: surround prints in the base filament),
+  //       throughIds [layer id] (colours that also fill the body underneath them)
   function buildKeychain(prep, opts, triangulate) {
     const aw = prep.width, ah = prep.height, acx = (aw - 1) / 2, acy = (ah - 1) / 2;
     const S = opts.sizeMM, shape = opts.shape || 'outline', rimW = Math.max(0, opts.rimWidthMM || 0), m = Math.max(0, opts.marginMM) + rimW;
@@ -813,6 +814,38 @@
         if (lab[i] >= 0 && rk(lab[i]) <= rk(L)) continue;
         if (lab[i] >= 0 && grow.some(([L2, , T2]) => L2 === lab[i] && T2[i])) continue;
         lab[i] = L; thinChanged++;
+      }
+    }
+    // colours that run "through the base": the body under them is printed in that colour. Under a surface-only
+    // colour (an ornament on the tree) the body takes the through colour that surrounds it; anywhere else the
+    // body stays in the base filament.
+    const through = new Set((opts.throughIds || []).filter(id => idSet.has(id)));
+    let zone = null;
+    if (through.size) {
+      zone = new Int32Array(N).fill(-1);
+      for (let i = 0; i < N; i++) if (through.has(lab[i])) zone[i] = lab[i];
+      // two kinds of patch: surface-only colours (class 1), and small bare spots of body between colours, such as
+      // a filled-in dent where the trunk meets the branches (class 2), which would otherwise leave tiny specks of
+      // base filament in every layer. The open surround around the art is large and stays in the base filament.
+      const cls = new Uint8Array(N);
+      for (let i = 0; i < N; i++) if (!through.has(lab[i])) cls[i] = lab[i] >= 0 ? 1 : body[i] && dInside[i] > 1.5 ? 2 : 0; // (a hairline along the edge is left out, so it can't join every spot into one)
+      const comp = new Uint8Array(N), stack = [], speck = 4 / (res * res);
+      for (let s0 = 0; s0 < N; s0++) {
+        if (comp[s0] || !cls[s0]) continue;
+        const c = cls[s0], px = []; comp[s0] = 1; stack.push(s0);
+        const votes = new Map(); let border = 0;
+        while (stack.length) {
+          const i = stack.pop(); px.push(i); const x = i % W, y = (i / W) | 0;
+          for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+            if (nx < 0 || ny < 0 || nx >= W || ny >= H) { border++; continue; }
+            const j = ny * W + nx;
+            if (cls[j] === c) { if (!comp[j]) { comp[j] = 1; stack.push(j); } continue; }
+            border++; if (through.has(lab[j])) votes.set(lab[j], (votes.get(lab[j]) || 0) + 1);
+          }
+        }
+        if (c === 2 && px.length > speck) continue;
+        let bestZ = -1, bestN = 0; for (const [z, n] of votes) if (n > bestN) { bestN = n; bestZ = z; }
+        if (bestZ >= 0 && (c === 2 || bestN >= 0.3 * border)) for (const i of px) zone[i] = bestZ;
       }
     }
     // key-ring tab: walk in from outside along the chosen direction until the hole sits just clear of the body
@@ -945,14 +978,39 @@
       const rz = Math.min(opts.recess.depthMM, Math.max(0.2, roof));
       cuts.push({ cov: blurField(erodeMask(fp, W, H, opts.recess.insetMM / res), W, H, Math.max(0.8, sPx)), z0: 0, z1: rz });
     }
-    // body below the colours, sliced wherever a cut starts or stops
+    // body below the colours, sliced wherever a cut starts or stops, and split into the through-colour zones
+    const zoneMeshes = new Map();
     if (Tb > 0) {
       const zs = [...new Set([0, Tb, ...cuts.flatMap(c => [c.z0, c.z1]).filter(z => z > 0 && z < Tb)])].sort((p, q) => p - q);
+      // zone shares: each through colour, and the base filament for the rest
+      let zf = null, zBest, zSecond, zId;
+      if (zone) {
+        // each share is blurred from that zone's own pixels inside the body, so near the outline (where the blur
+        // also sees the empty space outside) no zone loses ground to another, and the outline is the clip below
+        zf = new Map();
+        for (const id of [...through, 'base']) {
+          let any = false; for (let i = 0; i < N; i++) { const v = fp[i] && zone[i] === (id === 'base' ? -1 : id) ? 1 : 0; ind[i] = v; if (v) any = true; }
+          if (any) zf.set(id, blurField(ind, W, H, sPx));
+        }
+        zBest = new Float32Array(N).fill(-1); zSecond = new Float32Array(N).fill(-1); zId = new Array(N);
+        for (const [id, f] of zf) for (let i = 0; i < N; i++) { const v = f[i]; if (v > zBest[i]) { zSecond[i] = zBest[i]; zBest[i] = v; zId[i] = id; } else if (v > zSecond[i]) zSecond[i] = v; }
+      }
       for (let k = 0; k + 1 < zs.length; k++) {
         const za = zs[k], zb = zs[k + 1], act = cuts.filter(c => c.z0 <= za + 1e-6 && c.z1 >= zb - 1e-6);
-        let shp = outline;
-        if (act.length) { for (let i = 0; i < N; i++) { let v = fpSoft[i]; for (const c of act) v *= 1 - c.cov[i]; d[i] = 2 * v - 1; } shp = loopsToShapes(marchingSquares(d, W, H, 0), H, res, tol, minA); }
-        baseMeshes.push(extrudeShapes(shp, za, zb, triangulate));
+        const clip = new Float32Array(N);
+        for (let i = 0; i < N; i++) { let v = fpSoft[i]; for (const c of act) v *= 1 - c.cov[i]; clip[i] = 2 * v - 1; }
+        if (!zf) {
+          let shp = outline;
+          if (act.length) { d.set(clip); shp = loopsToShapes(marchingSquares(d, W, H, 0), H, res, tol, minA); }
+          baseMeshes.push(extrudeShapes(shp, za, zb, triangulate));
+          continue;
+        }
+        for (const [id, f] of zf) {
+          for (let i = 0; i < N; i++) d[i] = Math.min(f[i] - (zId[i] === id ? zSecond[i] : zBest[i]), clip[i]);
+          const shp = loopsToShapes(marchingSquares(d, W, H, 0), H, res, tol, minA); if (!shp.length) continue;
+          const m = extrudeShapes(shp, za, zb, triangulate);
+          if (id === 'base') baseMeshes.push(m); else { if (!zoneMeshes.has(id)) zoneMeshes.set(id, []); zoneMeshes.get(id).push(m); }
+        }
       }
     }
     if (rimW > 0) {
@@ -967,9 +1025,11 @@
     }
     if (baseMeshes.length) out.unshift({ id: 'base', mesh: concatMeshes(baseMeshes), shells: baseMeshes, shapes: outline, top: Tb || T });
     for (const L of opts.layers) {
-      if (!fields.has(L.id)) continue;
-      const shp = shapesOf(L.id); if (!shp.length) continue;
-      out.push({ id: L.id, mesh: extrudeShapes(shp, Tb, T, triangulate), shapes: shp, top: T });
+      const below = zoneMeshes.get(L.id) || [];
+      const shp = fields.has(L.id) ? shapesOf(L.id) : [];
+      if (!shp.length && !below.length) continue;
+      const shells = (shp.length ? [extrudeShapes(shp, Tb, T, triangulate)] : []).concat(below);
+      out.push({ id: L.id, mesh: shells.length > 1 ? concatMeshes(shells) : shells[0], shells: shells.length > 1 ? shells : undefined, shapes: shp, top: shp.length ? T : Tb });
     }
     // grid -> mm happened in loopsToShapes with y measured from the bottom row; recentre on the bounding box
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
