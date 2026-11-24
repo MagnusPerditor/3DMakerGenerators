@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.0.1
+
+### New
+- **Through the base** (flat generators: keychain, magnet, coaster, bookmark, flat model, dust cover): tick it on a color and the body under that color is printed in that color all the way down, so a tree's trunk can be brown, its branches green and its star yellow right through. Small details on top (ornaments) take the color around them underneath, and everything else keeps the base filament. It shows when the color depth is less than the thickness.
+
+### Fixed
+- Raising *Smooth edges* no longer pulls the colors in from the edge, which left a lower ledge of the base showing around the outside.
+- No more slivers of base filament where two colors meet at the outline (a star's points on a tree top, for example); small notches closed by *Fill gaps* between two colors take the color beside them.
+
 ## 2.0.0
 
 ### New: Paint a model
