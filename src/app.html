@@ -310,6 +310,7 @@ input[type=color]:not([data-native]) { cursor: pointer; }
       <button type="button" role="tab" id="genCookie" aria-selected="false"><b>Cookie cutter</b><small>Cutter + stamp</small></button>
       <button type="button" role="tab" id="genFlat" aria-selected="false"><b>Flat model</b><small>Just the art, face down</small></button>
       <button type="button" role="tab" id="genDust" aria-selected="false"><b>Dust cover</b><small>Joystick disc, face down</small></button>
+      <button type="button" role="tab" id="genSoap" aria-selected="false"><b>Soap holder plate</b><small>Slide-in front art</small></button>
       <button type="button" role="tab" id="genPaint" aria-selected="false"><b>Paint a model</b><small>Art onto your STL or 3MF</small></button>
     </div>
     <p class="extlink"><a href="https://quikclicks.app/" target="_blank" rel="noopener noreferrer">Clicker maker <span aria-hidden="true">↗</span><span class="sr">(opens QuikClicks in a new tab)</span></a><a href="https://app.printhq.io/" target="_blank" rel="noopener noreferrer">PrintHQ Vault <span aria-hidden="true">↗</span><span class="sr">(opens in a new tab)</span></a></p>
@@ -565,6 +566,13 @@ input[type=color]:not([data-native]) { cursor: pointer; }
         <input type="range" id="bHoleY" min="4" max="40" step="0.5" value="8">
       </div>
       </div>
+      </div>
+      <div id="kSoapSec" hidden>
+      <div class="field">
+        <label for="sValign">Art position</label>
+        <select id="sValign"><option value="center">Centered on the holder</option><option value="bottom">Just above the counter</option></select>
+      </div>
+      <p class="hint">Slides into the hand soap holder's rails from the top. A dovetail key goes on the back of the art, so the art can be any size and can hang past the holder on every side. Where the art doesn't cover the key's 68 × 126 mm face, the plate is filled in the surround filament. Prints face down with the key on top, no supports.</p>
       </div>
       <div id="kDustSec" hidden>
       <div class="field" id="dHoleField">
@@ -1218,10 +1226,10 @@ function renderTally() {
 $('baseColor').addEventListener('input', () => { if (S.gen === 'paint') S.pmBaseChosen = true; S.baseSpool = S.pickedSpool || null; $('baseSpool').textContent = S.baseSpool ? '· ' + spoolLabel(S.baseSpool) : ''; refreshSwatches(); drawPreview(); scheduleBuild(); });
 
 // ---------- rim / border wall filament (may be a filament no art region uses) ----------
-const freshRimCustom = () => ({ tray: null, coin: null, keychain: null, magnet: null, coaster: null, bookmark: null, cookie: null, flat: null, dust: null, paint: null, coasterRim: null, filler: null });
+const freshRimCustom = () => ({ tray: null, coin: null, keychain: null, magnet: null, coaster: null, bookmark: null, cookie: null, flat: null, dust: null, soap: null, paint: null, coasterRim: null, filler: null });
 S.rimCustom = freshRimCustom();
 // one filament slot per rim-like part; keychain, magnet and coaster share the surround/face selector
-const RIM_SEL = { tray: 'rimStyle', coin: 'cRimFil', keychain: 'kRimFil', magnet: 'kRimFil', coaster: 'kRimFil', bookmark: 'kRimFil', cookie: 'kRimFil', flat: 'kRimFil', dust: 'kRimFil', paint: 'kRimFil', coasterRim: 'qRimFil', filler: 'fFil' };
+const RIM_SEL = { tray: 'rimStyle', coin: 'cRimFil', keychain: 'kRimFil', magnet: 'kRimFil', coaster: 'kRimFil', bookmark: 'kRimFil', cookie: 'kRimFil', flat: 'kRimFil', dust: 'kRimFil', soap: 'kRimFil', paint: 'kRimFil', coasterRim: 'qRimFil', filler: 'fFil' };
 function rimCustomLabel(g) { const c = S.rimCustom[g]; return c.spool ? spoolLabel(c.spool) : 'Custom ' + colorName(c.color).toLowerCase(); }
 const rimSelect = () => $(RIM_SEL[S.gen]);
 function rimFill(g) {
@@ -1419,6 +1427,7 @@ async function build() {
         shape: kcShape(), sizeMM: g === 'bookmark' ? Math.max(+$('bLen').value, +$('bWid').value) : +$('kSize').value,
         rectWMM: +$('bWid').value, rectHMM: +$('bLen').value, cornerMM: +$('bCorner').value,
         centerHole: g === 'dust' ? { diaMM: +$('dHole').value } : null,
+        slideKey: g === 'soap' ? { valign: $('sValign').value } : null,
         tassel: g === 'bookmark' && $('bTassel').checked ? { diaMM: +$('bHole').value, fromEdgeMM: +$('bHoleY').value } : null,
         thicknessMM: +$('kThick').value, colorDepthMM: +$('kDepth').value,
         marginMM: +$('kMargin').value, fillGapsMM: +$('kGaps').value, artScale: +$('kScale').value / 100, offsetXMM: +$('kOffX').value, offsetYMM: +$('kOffY').value,
@@ -1511,10 +1520,12 @@ const GEN = {
   paint: { title: 'Paint a model', suffix: '_painted', imgH: 1, smooth: 0.15 },
   dust: { title: 'Dust cover', suffix: '_dust_cover', imgH: 1, smooth: 0.12,
     flat: { kSize: 41.5, kThick: 1, kDepth: 0.6, kMargin: 1, kGaps: 4, kScale: 100, kOffX: 0, kOffY: 0, shape: 'circle', kRimFil: '-1', faceDown: true } },
+  soap: { title: 'Soap holder plate', suffix: '_soap_plate', imgH: 1, smooth: 0.15,
+    flat: { kSize: 110, kThick: 3.5, kDepth: 1.5, kMargin: 0, kGaps: 1, kScale: 100, kOffX: 0, kOffY: 0, shape: 'outline', kRimFil: '-1', faceDown: true } },
 };
-const GEN_NAME = { tray: 'Trinket tray', coin: 'Coin & token', keychain: 'Keychain', magnet: 'Magnet', coaster: 'Coaster', bookmark: 'Bookmark', cookie: 'Cookie cutter', flat: 'Flat model', dust: 'Dust cover', paint: 'Paint a model' };
-const GEN_BTN = { tray: 'genTray', coin: 'genCoin', keychain: 'genKey', magnet: 'genMag', coaster: 'genCoast', bookmark: 'genBook', cookie: 'genCookie', flat: 'genFlat', dust: 'genDust', paint: 'genPaint' };
-const FLAT = new Set(['keychain', 'magnet', 'coaster', 'bookmark', 'flat', 'dust']); // share the flat-model panel
+const GEN_NAME = { tray: 'Trinket tray', coin: 'Coin & token', keychain: 'Keychain', magnet: 'Magnet', coaster: 'Coaster', bookmark: 'Bookmark', cookie: 'Cookie cutter', flat: 'Flat model', dust: 'Dust cover', soap: 'Hand soap holder plate', paint: 'Paint a model' };
+const GEN_BTN = { tray: 'genTray', coin: 'genCoin', keychain: 'genKey', magnet: 'genMag', coaster: 'genCoast', bookmark: 'genBook', cookie: 'genCookie', flat: 'genFlat', dust: 'genDust', soap: 'genSoap', paint: 'genPaint' };
+const FLAT = new Set(['keychain', 'magnet', 'coaster', 'bookmark', 'flat', 'dust', 'soap']); // share the flat-model panel
 const FLAT_IDS = ['kSize', 'kThick', 'kDepth', 'kMargin', 'kGaps', 'kScale', 'kOffX', 'kOffY'];
 function saveFlat(g) { const v = GEN[g].flat; FLAT_IDS.forEach(id => v[id] = +$(id).value); if (g !== 'bookmark') v.shape = kcShape(); v.kRimFil = $('kRimFil').value; v.faceDown = $('kFaceDown').checked; }
 function loadFlat(g) {
@@ -1533,7 +1544,7 @@ function syncKcShape() {
   $('kHoleFields').hidden = $('kHolePos').value === 'none';
   $('kRingSec').hidden = g !== 'keychain'; $('kMagSec').hidden = g !== 'magnet'; $('kCoastSec').hidden = g !== 'coaster';
   $('kFaceDownRow').hidden = g === 'coaster'; // the coaster rim stands above the face
-  $('kDustSec').hidden = g !== 'dust'; $('kSizeField').querySelector('label').textContent = g === 'dust' ? 'Outside diameter' : 'Size (longest side)';
+  $('kDustSec').hidden = g !== 'dust'; $('kSoapSec').hidden = g !== 'soap'; $('kSizeField').querySelector('label').textContent = g === 'dust' ? 'Outside diameter' : 'Size (longest side)';
   const bm = g === 'bookmark'; $('kBookSec').hidden = !bm; $('kShapeSec').hidden = bm; $('kSizeField').hidden = bm;
   $('bTasselFields').hidden = !$('bTassel').checked;
   $('kRimFilLbl').textContent = g === 'coaster' ? 'Face filament' : 'Surround filament';
@@ -1593,6 +1604,8 @@ $('genBook').addEventListener('click', () => setGen('bookmark'));
 $('genCookie').addEventListener('click', () => setGen('cookie'));
 $('genFlat').addEventListener('click', () => setGen('flat'));
 $('genDust').addEventListener('click', () => setGen('dust'));
+$('genSoap').addEventListener('click', () => setGen('soap'));
+$('sValign').addEventListener('change', scheduleBuild);
 $('genPaint').addEventListener('click', () => { setGen('paint'); if (!S.model) status('Choose the model to paint, then add an image, some text, or both.'); else if (!(S.prep && S.prep.labels)) showModelOnly(); else scheduleBuild(); });
 // ---------- paint a model ----------
 // Text alone (no image): a blank stand-in picture for the text to sit on. A real image replaces it.

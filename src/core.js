@@ -738,8 +738,18 @@
     else { sh = kcShape(shape, S, { w: opts.rectWMM, h: opts.rectHMM, corner: opts.cornerMM }); bw = sh.w; bh = sh.h; }
     // room for the ring tab and its fillet, and for the gap-filling dilation to grow and shrink back cleanly
     const pad = Math.max(hole ? 2 * Ro + gap + 2 : 0, shape === 'outline' ? Math.max(0, opts.fillGapsMM || 0) + 1 : 0) + 3;
-    const res = Math.max(0.05, (Math.max(bw, bh) + 2 * pad) / 800);
-    const W = Math.ceil((bw + 2 * pad) / res) + 2, H = Math.ceil((bh + 2 * pad) / res) + 2, N = W * H, cx = (W - 1) / 2, cy = (H - 1) / 2;
+    // slide-in key for the hand soap holder: the plate's back carries a dovetail that runs in the holder's rails.
+    // k0 is where the key starts (mm, measured up from the plate's centre); the counter is STOP below it.
+    const SK = opts.slideKey ? Object.assign({ lenMM: 126, backMM: 71, frontMM: 68, thickMM: 3, neckMM: 0.4, stopMM: 3, floorMM: 0.5, valign: 'center' }, opts.slideKey) : null;
+    let k0 = 0, gw = bw, gh = bh;
+    if (SK) {
+      const lo = -bh / 2, lowest = k0b => k0b - SK.stopMM + SK.floorMM; // the art may come no lower than this
+      k0 = SK.valign === 'bottom' ? lo + SK.stopMM - SK.floorMM : -SK.lenMM / 2;
+      if (lo < lowest(k0)) k0 = lo + SK.stopMM - SK.floorMM;       // tall art: never let it reach the counter
+      gw = Math.max(bw, SK.backMM + 2); gh = 2 * Math.max(bh / 2, Math.abs(k0), Math.abs(k0 + SK.lenMM)) + 2;
+    }
+    const res = Math.max(0.05, (Math.max(gw, gh) + 2 * pad) / 800);
+    const W = Math.ceil((gw + 2 * pad) / res) + 2, H = Math.ceil((gh + 2 * pad) / res) + 2, N = W * H, cx = (W - 1) / 2, cy = (H - 1) / 2;
     const Xof = x => (x - cx) * res, Yof = y => (cy - y) * res;
     let body = new Uint8Array(N);
     if (shape === 'outline') {
@@ -774,6 +784,12 @@
       for (let y = Math.max(0, Math.floor(cy - rp - 1)); y <= Math.min(H - 1, Math.ceil(cy + rp + 1)); y++)
         for (let x = Math.max(0, Math.floor(cx - rp - 1)); x <= Math.min(W - 1, Math.ceil(cx + rp + 1)); x++)
           if (Math.hypot(x - cx, y - cy) <= rp) body[y * W + x] = 0;
+    }
+    // the plate always covers the key's face: where the art is narrower, the surround fills in behind it
+    if (SK) {
+      for (let y = 0; y < H; y++) { const Y = Yof(y); if (Y < k0 || Y > k0 + SK.lenMM) continue;
+        for (let x = 0; x < W; x++) if (Math.abs(Xof(x)) <= SK.frontMM / 2) body[y * W + x] = 1; }
+      body = fillHoles(body, W, H);
     }
     // art labels, kept a little inside the edge
     const inv2 = new Uint8Array(N); for (let i = 0; i < N; i++) inv2[i] = body[i] ? 0 : 1;
@@ -1057,6 +1073,28 @@
       const shells = (shp.length ? [extrudeShapes(shp, Tb, T, triangulate)] : []).concat(below);
       out.push({ id: L.id, mesh: shells.length > 1 ? concatMeshes(shells) : shells[0], shells: shells.length > 1 ? shells : undefined, shapes: shp, top: shp.length ? T : Tb });
     }
+    // the key on the back: a dovetail (narrow at the plate, wide at the holder wall) on a thin neck, so the art
+    // itself sits just clear of the rail lips and can overhang the holder on every side. Built below z=0, then
+    // everything is lifted so the key's back is on the bed (the face-down flip puts the art on the bed instead).
+    let lift = 0;
+    if (SK) {
+      const X0 = cx * res, Y0 = cy * res + k0, Y1 = Y0 + SK.lenMM, zB = -(SK.neckMM + SK.thickMM), zF = -SK.neckMM;
+      const yz = (prof, ya, yb) => { // extrude an (x,z) profile along y
+        const m = extrudeShapes([{ outer: prof, holes: [] }], ya, yb, triangulate), p = m.positions;
+        for (let i = 0; i < p.length; i += 3) { const t = p[i + 1]; p[i + 1] = p[i + 2]; p[i + 2] = t; }
+        const ix = m.indices; for (let i = 0; i < ix.length; i += 3) { const t = ix[i + 1]; ix[i + 1] = ix[i + 2]; ix[i + 2] = t; }
+        return m;
+      };
+      const hb = SK.backMM / 2, hf = SK.frontMM / 2;
+      const key = yz([[X0 - hb, zB], [X0 + hb, zB], [X0 + hf, zF], [X0 - hf, zF]], Y0, Y1);
+      const neck = yz([[X0 - hf, zF], [X0 + hf, zF], [X0 + hf, 0.01], [X0 - hf, 0.01]], Y0, Y1);
+      const backer = opts.marginLayer != null && opts.marginLayer >= 0 ? out.find(o => o.id === opts.marginLayer) : out.find(o => o.id === 'base');
+      if (backer) { backer.shells = (backer.shells || [backer.mesh]).concat([key, neck]); backer.mesh = concatMeshes(backer.shells); }
+      else out.unshift({ id: 'base', mesh: concatMeshes([key, neck]), shells: [key, neck], shapes: [], top: 0 });
+      lift = SK.neckMM + SK.thickMM;
+      for (const o of out) { for (const m of (o.shells || [o.mesh])) { const p = m.positions; for (let i = 2; i < p.length; i += 3) p[i] += lift; }
+        if (o.shells) o.mesh = concatMeshes(o.shells); o.top += lift; }
+    }
     // grid -> mm happened in loopsToShapes with y measured from the bottom row; recentre on the bounding box
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (const o of out) { const p = o.mesh.positions; for (let i = 0; i < p.length; i += 3) { if (p[i] < x0) x0 = p[i]; if (p[i] > x1) x1 = p[i]; if (p[i + 1] < y0) y0 = p[i + 1]; if (p[i + 1] > y1) y1 = p[i + 1]; } }
@@ -1065,7 +1103,7 @@
     // final mm -> grid mm: X_grid = X + mx - cx*res ; Y_grid = Y + my - (H-1-cy)*res
     const ox = mx - cx * res, oy = my - (H - 1 - cy) * res;
     const toArt = (X, Y) => [((X + ox) - artCX) / kArt + acx, acy - ((Y + oy) - artCY) / kArt];
-    let zTop = T; for (const o of out) if (o.top > zTop) zTop = o.top;
+    let zTop = T + lift; for (const o of out) if (o.top > zTop) zTop = o.top;
     return { parts: out, size: [x1 - x0, y1 - y0], height: zTop, mmPerPx: kArt, hole: !!P, pockets: pockets.length, pauseZ, fillers, thinFixed, thinChanged, warnings, map: { toArt } };
   }
 
